@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "rheo_storage_lib",
+    "rheo_storage_def_builder",
+]
+resolver = "3"
