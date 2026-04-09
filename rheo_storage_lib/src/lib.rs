@@ -1,14 +1,13 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Rust-native storage analysis primitives for the Rheo rewrite.
+//!
+//! This crate currently focuses on milestone one: immutable file metadata and
+//! content-based file analysis backed by the legacy `filedefs.rpkg` package.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod analysis;
+mod definitions;
+pub mod error;
+pub mod info;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
+pub use error::StorageError;
+pub use info::FileInfo;
