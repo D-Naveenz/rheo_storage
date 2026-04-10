@@ -1,26 +1,26 @@
+mod builder;
 mod logging;
+mod runner;
+mod ui;
 
 use std::fs;
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
-use crossterm::event::{Event, read};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
-use rheo_storage_def_builder::{
-    TridBuildProgress, TridBuildStage, TridTransformReport, build_trid_xml_package_with_progress,
-    inspect_package, load_bundled_package, normalize_package, packages_match, write_package,
-};
-use tracing::{error, info};
+use color_eyre::eyre::{Result, eyre};
 
 use crate::logging::{LoggingOptions, init_logging};
+use crate::runner::{BuilderAction, print_report};
 
 #[derive(Debug, Parser)]
 #[command(name = "rheo_storage_def_builder")]
 #[command(about = "Build, inspect, and normalize Rheo definitions packages.")]
 #[command(version)]
 #[command(next_line_help = true)]
+#[command(
+    after_help = "Interactive mode:\n  Launch without a subcommand in a real terminal to open the Rheo shell.\n  Use --silent to keep the classic non-interactive help/output behavior."
+)]
 struct Cli {
     /// Suppress normal command output and keep only errors.
     #[arg(short = 's', long, global = true)]
@@ -86,285 +86,11 @@ enum Command {
     },
 }
 
-#[derive(Debug, Clone)]
-struct Output {
-    silent: bool,
-    log_path: PathBuf,
-}
-
-impl Output {
-    fn new(silent: bool, log_path: PathBuf) -> Self {
-        Self { silent, log_path }
-    }
-
-    fn section(&self, title: &str) {
-        if self.silent {
-            return;
-        }
-        println!("{title}");
-    }
-
-    fn field(&self, label: &str, value: impl std::fmt::Display) {
-        if self.silent {
-            return;
-        }
-        println!("{label:<20} {value}");
-    }
-
-    fn blank_line(&self) {
-        if self.silent {
-            return;
-        }
-        println!();
-    }
-
-    fn log_location(&self) {
-        self.field("Log", self.log_path.display());
-    }
-}
-
-struct BuildUi {
-    multi: MultiProgress,
-    stage: ProgressBar,
-    detail: ProgressBar,
-    silent: bool,
-}
-
-impl BuildUi {
-    fn new(silent: bool) -> Self {
-        let multi = MultiProgress::new();
-        if silent {
-            multi.set_draw_target(ProgressDrawTarget::hidden());
-        }
-
-        let stage = multi.add(ProgressBar::new_spinner());
-        stage.set_style(
-            ProgressStyle::with_template("{spinner:.cyan} {msg}").expect("valid spinner template"),
-        );
-        stage.enable_steady_tick(std::time::Duration::from_millis(100));
-
-        let detail = multi.add(ProgressBar::new(0));
-        detail.set_style(
-            ProgressStyle::with_template("{bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
-                .expect("valid progress template")
-                .progress_chars("##-"),
-        );
-        detail.set_message("Waiting");
-
-        Self {
-            multi,
-            stage,
-            detail,
-            silent,
-        }
-    }
-
-    fn update(&self, progress: TridBuildProgress) {
-        if self.silent {
-            return;
-        }
-
-        self.stage.set_message(stage_title(progress.stage));
-        match progress.total {
-            Some(total) => {
-                self.detail.set_length(total as u64);
-                self.detail.set_position(progress.current as u64);
-                self.detail.set_message(progress.message);
-            }
-            None => {
-                self.detail.set_length(0);
-                self.detail.set_position(0);
-                self.detail.set_message(progress.message);
-            }
-        }
-    }
-
-    fn finish(&self) {
-        if self.silent {
-            return;
-        }
-        self.stage.finish_and_clear();
-        self.detail.finish_and_clear();
-        let _ = self.multi.clear();
-    }
-}
-
-fn stage_title(stage: TridBuildStage) -> &'static str {
-    match stage {
-        TridBuildStage::LoadSource => "Loading source",
-        TridBuildStage::ExtractArchive => "Extracting archive",
-        TridBuildStage::ParseDefinitions => "Parsing definitions",
-        TridBuildStage::ReduceDefinitions => "Reducing definitions",
-        TridBuildStage::FinalizePackage => "Finalizing package",
-    }
-}
-
-fn main() {
-    let cli = Cli::parse();
-    let paths = BuilderPaths::from_cli(&cli).unwrap_or_else(|error| {
-        eprintln!("failed to resolve builder paths: {error}");
-        std::process::exit(1);
-    });
-    let logging = init_logging(LoggingOptions {
-        silent: cli.silent,
-        verbose: cli.verbose,
-        logs_dir: paths.logs_dir.clone(),
-    })
-    .unwrap_or_else(|error| {
-        eprintln!("failed to initialize logging: {error}");
-        std::process::exit(1);
-    });
-
-    let output = Output::new(cli.silent, logging.log_path.clone());
-    let result = run(cli.command, &paths, output);
-    if let Err(error) = result {
-        error!(error = %error, "builder command failed");
-        pause_before_exit(cli.silent);
-        std::process::exit(1);
-    }
-    pause_before_exit(cli.silent);
-}
-
-fn run(
-    command: Option<Command>,
-    paths: &BuilderPaths,
-    output: Output,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(command) = command else {
-        if !output.silent {
-            let mut cli = Cli::command();
-            cli.print_help()?;
-            println!();
-        }
-        return Ok(());
-    };
-
-    match command {
-        Command::Pack { output: path } => {
-            let path = path.unwrap_or_else(|| paths.default_package_output_path());
-            info!(output = %path.display(), "packing bundled runtime definitions");
-            let package = load_bundled_package()?;
-            let written = write_package(&package, path)?;
-
-            output.section("Bundled Package");
-            output.field("Output", written.display());
-            output.log_location();
-        }
-        Command::BuildTridXml {
-            input,
-            output: path,
-        } => {
-            let input = input.unwrap_or_else(|| paths.default_trid_input_path());
-            let path = path.unwrap_or_else(|| paths.default_package_output_path());
-            info!(input = %input.display(), output = %path.display(), "building reduced TrID XML package");
-            let ui = BuildUi::new(output.silent);
-            let build =
-                build_trid_xml_package_with_progress(&input, |progress| ui.update(progress))?;
-            ui.finish();
-            let written = write_package(&build.package, path)?;
-
-            output.section("Build Complete");
-            output.field("Input", input.display());
-            output.field("Output", written.display());
-            output.log_location();
-            output.blank_line();
-            print_transform_report(&output, &build.report);
-        }
-        Command::Inspect { input } => {
-            let input = input.unwrap_or_else(|| paths.default_package_output_path());
-            info!(input = %input.display(), "inspecting definitions package");
-            let summary = inspect_package(input)?;
-
-            output.section("Package Summary");
-            output.field("Package Version", &summary.package_version);
-            output.field("Tags", summary.tags);
-            output.field("Definitions", summary.definition_count);
-            output.field("Log", output.log_path.display());
-        }
-        Command::InspectTridXml { input } => {
-            let input = input.unwrap_or_else(|| paths.default_trid_input_path());
-            info!(input = %input.display(), "inspecting TrID XML source");
-            let ui = BuildUi::new(output.silent);
-            let report = {
-                let build =
-                    build_trid_xml_package_with_progress(&input, |progress| ui.update(progress))?;
-                build.report
-            };
-            ui.finish();
-
-            output.section("Transformation Preview");
-            print_transform_report(&output, &report);
-            output.log_location();
-        }
-        Command::Normalize {
-            input,
-            output: path,
-        } => {
-            let input = input.unwrap_or_else(|| paths.default_package_output_path());
-            let path = path.unwrap_or_else(|| paths.default_package_output_path());
-            info!(input = %input.display(), output = %path.display(), "normalizing definitions package");
-            let written = normalize_package(input, path)?;
-
-            output.section("Normalized Package");
-            output.field("Output", written.display());
-            output.log_location();
-        }
-        Command::Verify { left, right } => {
-            info!(left = %left.display(), right = %right.display(), "verifying package equality");
-            let matches = packages_match(left, right)?;
-
-            output.section("Verification");
-            output.field("Result", if matches { "match" } else { "different" });
-            output.log_location();
-            if !matches {
-                std::process::exit(1);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn print_transform_report(output: &Output, report: &TridTransformReport) {
-    output.field("Total Parsed", report.total_parsed);
-    output.field("MIME Corrected", report.mime_corrected);
-    output.field("MIME Rejected", report.mime_rejected);
-    output.field("Extension Rejected", report.extension_rejected);
-    output.field("Signature Rejected", report.signature_rejected);
-    output.field("Final Trimmed", report.final_trimmed);
-    output.field("Final Kept", report.final_kept);
-}
-
-fn pause_before_exit(silent: bool) {
-    if silent || !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-        return;
-    }
-
-    let _ = write!(io::stdout(), "\nPress any key to continue . . .");
-    let _ = io::stdout().flush();
-
-    if enable_raw_mode().is_ok() {
-        let _ = wait_for_keypress();
-        let _ = disable_raw_mode();
-    }
-
-    let _ = writeln!(io::stdout());
-}
-
-fn wait_for_keypress() -> io::Result<()> {
-    loop {
-        match read()? {
-            Event::Key(_) => return Ok(()),
-            _ => continue,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct BuilderPaths {
-    package_dir: PathBuf,
-    output_dir: PathBuf,
-    logs_dir: PathBuf,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BuilderPaths {
+    pub(crate) package_dir: PathBuf,
+    pub(crate) output_dir: PathBuf,
+    pub(crate) logs_dir: PathBuf,
 }
 
 impl BuilderPaths {
@@ -386,13 +112,120 @@ impl BuilderPaths {
         })
     }
 
-    fn default_trid_input_path(&self) -> PathBuf {
+    pub(crate) fn default_trid_input_path(&self) -> PathBuf {
         resolve_default_trid_source(&self.package_dir)
     }
 
-    fn default_package_output_path(&self) -> PathBuf {
+    pub(crate) fn default_package_output_path(&self) -> PathBuf {
         self.output_dir.join("filedefs.rpkg")
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LaunchMode {
+    InteractiveShell,
+    Direct,
+    Help,
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let exit_code = try_main()?;
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
+    Ok(())
+}
+
+fn try_main() -> Result<i32> {
+    let cli = Cli::parse();
+    let paths = BuilderPaths::from_cli(&cli)?;
+
+    let launch_mode = determine_launch_mode(
+        cli.command.as_ref(),
+        cli.silent,
+        io::stdin().is_terminal(),
+        io::stdout().is_terminal(),
+    );
+
+    let logging = init_logging(LoggingOptions {
+        silent: cli.silent,
+        verbose: cli.verbose,
+        logs_dir: paths.logs_dir.clone(),
+        interactive: matches!(launch_mode, LaunchMode::InteractiveShell),
+    })?;
+
+    match launch_mode {
+        LaunchMode::InteractiveShell => {
+            ui::run_shell(paths.clone(), logging.log_path.clone())?;
+            Ok(0)
+        }
+        LaunchMode::Direct => {
+            let action = resolve_action(
+                cli.command.expect("direct launch requires a command"),
+                &paths,
+            );
+            run_direct_action(action, &logging.log_path, cli.silent)
+        }
+        LaunchMode::Help => {
+            print_help()?;
+            Ok(0)
+        }
+    }
+}
+
+fn determine_launch_mode(
+    command: Option<&Command>,
+    silent: bool,
+    stdin_is_terminal: bool,
+    stdout_is_terminal: bool,
+) -> LaunchMode {
+    if command.is_some() {
+        LaunchMode::Direct
+    } else if !silent && stdin_is_terminal && stdout_is_terminal {
+        LaunchMode::InteractiveShell
+    } else {
+        LaunchMode::Help
+    }
+}
+
+fn resolve_action(command: Command, paths: &BuilderPaths) -> BuilderAction {
+    match command {
+        Command::Pack { output } => BuilderAction::Pack {
+            output: output.unwrap_or_else(|| paths.default_package_output_path()),
+        },
+        Command::BuildTridXml { input, output } => BuilderAction::BuildTridXml {
+            input: input.unwrap_or_else(|| paths.default_trid_input_path()),
+            output: output.unwrap_or_else(|| paths.default_package_output_path()),
+        },
+        Command::Inspect { input } => BuilderAction::Inspect {
+            input: input.unwrap_or_else(|| paths.default_package_output_path()),
+        },
+        Command::InspectTridXml { input } => BuilderAction::InspectTridXml {
+            input: input.unwrap_or_else(|| paths.default_trid_input_path()),
+        },
+        Command::Normalize { input, output } => BuilderAction::Normalize {
+            input: input.unwrap_or_else(|| paths.default_package_output_path()),
+            output: output.unwrap_or_else(|| paths.default_package_output_path()),
+        },
+        Command::Verify { left, right } => BuilderAction::Verify { left, right },
+    }
+}
+
+fn run_direct_action(action: BuilderAction, log_path: &Path, silent: bool) -> Result<i32> {
+    let report = crate::runner::execute_action(action, log_path, |_| {})
+        .map_err(|error| eyre!(error.to_string()))?;
+    if !silent {
+        print_report(&report);
+    }
+    Ok(report.exit_code)
+}
+
+fn print_help() -> io::Result<()> {
+    let mut cli = Cli::command();
+    cli.print_help()?;
+    println!();
+    Ok(())
 }
 
 fn builder_base_dir() -> io::Result<PathBuf> {
@@ -452,7 +285,9 @@ mod tests {
     use clap::Parser;
     use tempfile::tempdir;
 
-    use super::{BuilderPaths, resolve_default_trid_source};
+    use super::{
+        BuilderPaths, Cli, Command, LaunchMode, determine_launch_mode, resolve_default_trid_source,
+    };
 
     #[test]
     fn default_source_prefers_trid_archive_when_present() {
@@ -474,7 +309,7 @@ mod tests {
         unsafe {
             std::env::set_var("RHEO_STORAGE_DEF_BUILDER_BASE_DIR", temp.path());
         }
-        let cli = super::Cli::parse_from(["builder"]);
+        let cli = Cli::parse_from(["builder"]);
         let paths = BuilderPaths::from_cli(&cli).unwrap();
         unsafe {
             std::env::remove_var("RHEO_STORAGE_DEF_BUILDER_BASE_DIR");
@@ -483,5 +318,24 @@ mod tests {
         assert_eq!(paths.package_dir, temp.path().join("package"));
         assert_eq!(paths.output_dir, temp.path().join("output"));
         assert_eq!(paths.logs_dir, temp.path().join("logs"));
+    }
+
+    #[test]
+    fn no_subcommand_with_tty_launches_shell() {
+        let mode = determine_launch_mode(None, false, true, true);
+        assert_eq!(mode, LaunchMode::InteractiveShell);
+    }
+
+    #[test]
+    fn silent_without_subcommand_falls_back_to_help() {
+        let mode = determine_launch_mode(None, true, true, true);
+        assert_eq!(mode, LaunchMode::Help);
+    }
+
+    #[test]
+    fn explicit_command_stays_direct() {
+        let command = Command::Inspect { input: None };
+        let mode = determine_launch_mode(Some(&command), false, true, true);
+        assert_eq!(mode, LaunchMode::Direct);
     }
 }

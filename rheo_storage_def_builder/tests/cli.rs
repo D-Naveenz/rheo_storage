@@ -53,6 +53,7 @@ fn running_without_a_subcommand_prints_help_and_exits_cleanly() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Build, inspect, and normalize Rheo definitions packages."));
     assert!(stdout.contains("Usage:"));
+    assert!(stdout.contains("Interactive mode:"));
 }
 
 #[test]
@@ -90,12 +91,13 @@ fn default_package_output_and_logs_directories_are_used() {
 
     assert!(output.status.success(), "command should succeed");
     assert!(temp.path().join("output").join("filedefs.rpkg").exists());
-    assert!(
-        temp.path()
-            .join("logs")
-            .join("rheo_storage_def_builder.log")
-            .exists()
-    );
+    let log_files = fs::read_dir(temp.path().join("logs"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(log_files.len(), 1);
+    assert!(log_files[0].ends_with("_def_builder.log"));
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Build Complete"));

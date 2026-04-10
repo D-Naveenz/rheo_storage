@@ -4,7 +4,7 @@ use std::path::Path;
 use rheo_storage::{DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern};
 use tracing::{debug, info};
 
-use crate::BuilderError;
+use crate::builder::BuilderError;
 
 mod mime;
 mod model;
@@ -90,11 +90,10 @@ pub struct TridBuildOutput {
 ///
 /// # Examples
 ///
-/// ```no_run
-/// use rheo_storage_def_builder::build_trid_xml_package;
-///
-/// let _ = build_trid_xml_package("temp/trid-defs/triddefs_xml.7z");
+/// ```ignore
+/// # // Internal CLI helper; exercised through the binary integration tests.
 /// ```
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn build_trid_xml_package(source: impl AsRef<Path>) -> Result<DefinitionPackage, BuilderError> {
     Ok(build_trid_xml_package_with_report(source)?.package)
 }
@@ -127,6 +126,7 @@ where
 /// # Errors
 ///
 /// Returns an error when the source cannot be transformed successfully.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn build_trid_xml_package_with_report(
     source: impl AsRef<Path>,
 ) -> Result<TridBuildOutput, BuilderError> {
@@ -271,11 +271,10 @@ fn build_trid_xml_package_with_report_internal(
 ///
 /// # Examples
 ///
-/// ```no_run
-/// use rheo_storage_def_builder::inspect_trid_xml_source;
-///
-/// let _ = inspect_trid_xml_source("temp/trid-defs/triddefs_xml.7z");
+/// ```ignore
+/// # // Internal CLI helper; exercised through the binary integration tests.
 /// ```
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn inspect_trid_xml_source(
     source: impl AsRef<Path>,
 ) -> Result<TridTransformReport, BuilderError> {

@@ -1,6 +1,9 @@
 [package]
 name = "rheo_storage"
 version = "0.1.0"
+description = "Lib"
+authors = ["Naveen Dharmathunga <dasheenaveen@outlook.com>"]
+license = "Apache-2.0"
 edition = "2024"
 
 [lib]

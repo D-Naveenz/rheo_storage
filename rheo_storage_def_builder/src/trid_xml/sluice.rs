@@ -130,7 +130,9 @@ fn score_definition(
 #[cfg(test)]
 mod tests {
     use super::score_definition;
-    use crate::trid_xml::{ParsedTridDefinition, TridPattern, TridSignature, mime::MimeConfidence};
+    use crate::builder::trid_xml::{
+        ParsedTridDefinition, TridPattern, TridSignature, mime::MimeConfidence,
+    };
 
     #[test]
     fn higher_quality_definitions_score_above_weaker_ones() {

@@ -8,3 +8,6 @@ spread across the normal source tree.
   compiled binary, similar to an MSBuild "Copy to Output Directory" step.
 - When the CLI runs without an explicit `--input`, it looks here first and
   prefers `triddefs_xml.7z` when it exists.
+- Launching the builder without a subcommand opens the interactive Rheo shell
+  when a real terminal is available, and that shell uses this copied `package/`
+  directory as its default source location.

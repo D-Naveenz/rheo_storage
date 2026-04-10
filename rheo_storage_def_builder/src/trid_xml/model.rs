@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use quick_xml::de::from_str;
 use serde::Deserialize;
 
-use crate::BuilderError;
+use crate::builder::BuilderError;
 
 use super::{ParsedTridDefinition, TridPattern, TridSignature};
 
@@ -118,9 +118,9 @@ pub(crate) fn parse_trid_xml_definition(
         .unwrap_or_default()
         .strings
         .into_iter()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .map(|value| value.into_bytes())
+        .map(|value: String| value.trim().to_string())
+        .filter(|value: &String| !value.is_empty())
+        .map(|value: String| value.into_bytes())
         .collect::<Vec<_>>();
 
     Ok(ParsedTridDefinition {

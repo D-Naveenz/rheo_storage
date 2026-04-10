@@ -1,6 +1,7 @@
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 
+use chrono::{Local, NaiveDate};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::Layer;
 use tracing_subscriber::filter::LevelFilter;
@@ -14,6 +15,7 @@ pub(crate) struct LoggingOptions {
     pub(crate) silent: bool,
     pub(crate) verbose: u8,
     pub(crate) logs_dir: PathBuf,
+    pub(crate) interactive: bool,
 }
 
 pub(crate) struct LoggingRuntime {
@@ -23,7 +25,7 @@ pub(crate) struct LoggingRuntime {
 
 pub(crate) fn init_logging(options: LoggingOptions) -> Result<LoggingRuntime, std::io::Error> {
     fs::create_dir_all(&options.logs_dir)?;
-    let log_path = options.logs_dir.join("rheo_storage_def_builder.log");
+    let log_path = log_file_path(&options.logs_dir);
     let file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -31,7 +33,9 @@ pub(crate) fn init_logging(options: LoggingOptions) -> Result<LoggingRuntime, st
 
     let (writer, guard) = tracing_appender::non_blocking(file);
 
-    let console_max_level = if options.silent {
+    let console_max_level = if options.interactive {
+        LevelFilter::ERROR
+    } else if options.silent {
         LevelFilter::ERROR
     } else {
         match options.verbose {
@@ -85,7 +89,24 @@ fn io_error_from_set_global_default(
     std::io::Error::other(error)
 }
 
-#[allow(dead_code)]
 pub(crate) fn log_file_path(logs_dir: &Path) -> PathBuf {
-    logs_dir.join("rheo_storage_def_builder.log")
+    let today = Local::now().date_naive();
+    logs_dir.join(dated_log_file_name_for(today))
+}
+
+fn dated_log_file_name_for(date: NaiveDate) -> String {
+    format!("{}_def_builder.log", date.format("%Y-%m-%d"))
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::NaiveDate;
+
+    use super::dated_log_file_name_for;
+
+    #[test]
+    fn log_file_name_uses_iso_local_date_format() {
+        let date = NaiveDate::from_ymd_opt(2026, 4, 10).unwrap();
+        assert_eq!(dated_log_file_name_for(date), "2026-04-10_def_builder.log");
+    }
 }

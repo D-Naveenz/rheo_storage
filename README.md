@@ -14,8 +14,10 @@ Rust-first rewrite of `Rheo.Storage`.
 - The builder now uses executable-relative defaults:
   - `package/` for TrID source discovery
   - `output/` for generated `filedefs.rpkg`
-  - `logs/` for `rheo_storage_def_builder.log`
+  - `logs/` for dated log files such as `2026-04-10_def_builder.log`
 - All three locations can still be overridden from the CLI with `--package-dir`, `--output-dir`, and `--logs-dir`, or by passing explicit `--input` and `--output` paths on commands that support them.
+- Launching `rheo_storage_def_builder` without a subcommand in a real terminal now opens the interactive Rheo shell.
+- Explicit subcommands still run directly, so scripting and automation remain compatible.
 
 ## Consumer Docs
 - [Rust consumer](./docs/reference/rust-consumer.md)

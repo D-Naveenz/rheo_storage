@@ -1,7 +1,15 @@
 [workspace]
 members = [
+    "hello-world",
     "rheo_storage",
     "rheo_storage_def_builder",
     "rheo_storage_winrt",
 ]
 resolver = "3"
+
+# Read the optimization guideline for more details: https://ratatui.rs/recipes/apps/release-your-app/#optimizations
+[profile.release]
+codegen-units = 1   # Allows compiler to perform better optimization.
+lto = true          # Enables Link-time Optimization.
+opt-level = "s"     # Prioritizes small binary size. Use `3` if you prefer speed.
+strip = true        # Ensures debug symbols are removed.
