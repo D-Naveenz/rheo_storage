@@ -10,4 +10,4 @@ pub mod info;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
 pub use error::StorageError;
-pub use info::FileInfo;
+pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};

@@ -14,6 +14,10 @@ pub enum StorageError {
     #[error("path is not a file: {path}")]
     NotAFile { path: PathBuf },
 
+    /// The supplied path existed but did not refer to a directory.
+    #[error("path is not a directory: {path}")]
+    NotADirectory { path: PathBuf },
+
     /// A path-based I/O operation failed.
     #[error("failed to {operation} '{path}': {source}")]
     Io {
