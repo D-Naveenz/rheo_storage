@@ -29,7 +29,8 @@
 ## Builder Scope
 - `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
 - Support `.xml` files, extracted definition directories, and `.7z` archives without requiring users to manually unpack large definition sets into the repo.
-- Preserve the current `filedefs.rpkg` runtime contract until the runtime itself needs a format change.
+- Preserve the logical `filedefs.rpkg` runtime contract even if the on-disk encoding changes; the runtime should read both legacy plain packages and the newer compressed ones.
+- Keep MIME validation offline and deterministic by vendoring a normalized IANA snapshot plus custom overlay types into the repo.
 - Keep builder output deterministic even when source archives contain inconsistent XML such as repeated optional nodes.
 
 ## ABI Layer Rules

@@ -22,7 +22,8 @@
 ## Current Milestone
 - `rheo_storage_lib` owns analysis, immutable metadata, file and directory operations, navigation, debounced watching, typed errors, and legacy definitions loading.
 - The operations layer should keep the simple path fast: do not force info or analysis loading for plain copy, move, read, write, or delete calls.
-- `rheo_storage_def_builder` owns package inspection, normalization, and TrID XML source ingestion from `.xml`, extracted directories, and `.7z` archives.
+- `rheo_storage_def_builder` owns package inspection, normalization, vendored MIME validation, floodgate reduction, and TrID XML source ingestion from `.xml`, extracted directories, and `.7z` archives.
+- `filedefs.rpkg` now supports dual-read package loading: legacy plain MessagePack and the newer Rheo LZ4-wrapped format.
 - `rheo_storage_com` and `rheo_storage_winrt` are wrapper layers over the Rust core and must stay thin.
 
 ## Working Rhythm

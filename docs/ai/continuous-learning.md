@@ -14,3 +14,5 @@
 - Shared package types between the runtime and builder are safer than re-describing the MessagePack contract in multiple crates.
 - TrID XML is structurally simple enough to parse directly, but the builder should tolerate messy source data such as repeated optional nodes instead of assuming every file is perfectly normalized.
 - On Windows, the system `tar` tool can handle `.7z` archives well enough for builder ingestion, which avoids forcing contributors to manually unpack tens of thousands of TrID XML files into the repo.
+- A vendored MIME snapshot keeps transformation runs deterministic and offline while still letting the builder correct broken TrID MIME values back to canonical forms.
+- Upgrading `rpkg` to a compressed format is safest when the runtime dual-reads both old and new payloads, so package improvements do not force a flag day migration.
