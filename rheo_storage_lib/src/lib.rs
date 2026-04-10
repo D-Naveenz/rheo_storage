@@ -6,13 +6,18 @@
 //! layer with optional async wrappers.
 
 pub mod analysis;
-mod definitions;
+pub mod definitions;
 pub mod error;
 pub mod info;
 pub mod operations;
 pub mod storage;
+pub mod watch;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
+pub use definitions::{
+    DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern,
+    bundled_definition_package, decode_definition_package, encode_definition_package,
+};
 pub use error::StorageError;
 pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};
 pub use operations::{
@@ -30,4 +35,5 @@ pub use operations::{
     read_file_async, read_file_to_string_async, rename_directory_async, rename_file_async,
     write_file_async, write_file_from_reader_async, write_file_string_async,
 };
-pub use storage::{DirectoryStorage, FileStorage, StorageEntry};
+pub use storage::{DirectoryStorage, FileStorage, SearchScope, StorageEntry};
+pub use watch::{DirectoryWatchHandle, StorageChangeEvent, StorageChangeType, StorageWatchConfig};

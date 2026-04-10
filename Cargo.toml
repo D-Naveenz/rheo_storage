@@ -2,5 +2,7 @@
 members = [
     "rheo_storage_lib",
     "rheo_storage_def_builder",
+    "rheo_storage_com",
+    "rheo_storage_winrt",
 ]
 resolver = "3"

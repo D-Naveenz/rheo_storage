@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 
 use crate::error::StorageError;
 use crate::info::DirectoryInfo;
@@ -8,6 +9,9 @@ use crate::operations::{
     create_directory, create_directory_all, delete_directory, delete_directory_with_options,
     move_directory, move_directory_with_options, rename_directory,
 };
+use crate::watch::{DirectoryWatchHandle, StorageWatchConfig};
+
+use super::{FileStorage, SearchScope, StorageEntry};
 
 /// Rust-native handle for directory operations and metadata lookups.
 ///
@@ -71,6 +75,77 @@ impl DirectoryStorage {
         DirectoryInfo::from_path_with_summary(&self.path)
     }
 
+    /// Enumerate child files in this directory.
+    pub fn files(&self) -> Result<Vec<FileStorage>, StorageError> {
+        self.files_matching("*", SearchScope::TopDirectoryOnly)
+    }
+
+    /// Enumerate child files matching a glob pattern.
+    pub fn files_matching(
+        &self,
+        pattern: &str,
+        scope: SearchScope,
+    ) -> Result<Vec<FileStorage>, StorageError> {
+        collect_matching_paths(&self.path, pattern, scope, EntryFilter::Files)?
+            .into_iter()
+            .map(FileStorage::from_existing)
+            .collect()
+    }
+
+    /// Enumerate child directories in this directory.
+    pub fn directories(&self) -> Result<Vec<DirectoryStorage>, StorageError> {
+        self.directories_matching("*", SearchScope::TopDirectoryOnly)
+    }
+
+    /// Enumerate child directories matching a glob pattern.
+    pub fn directories_matching(
+        &self,
+        pattern: &str,
+        scope: SearchScope,
+    ) -> Result<Vec<DirectoryStorage>, StorageError> {
+        collect_matching_paths(&self.path, pattern, scope, EntryFilter::Directories)?
+            .into_iter()
+            .map(DirectoryStorage::from_existing)
+            .collect()
+    }
+
+    /// Enumerate files and directories together.
+    pub fn entries(&self) -> Result<Vec<StorageEntry>, StorageError> {
+        self.entries_matching("*", SearchScope::TopDirectoryOnly)
+    }
+
+    /// Enumerate files and directories together using a glob pattern.
+    pub fn entries_matching(
+        &self,
+        pattern: &str,
+        scope: SearchScope,
+    ) -> Result<Vec<StorageEntry>, StorageError> {
+        collect_matching_paths(&self.path, pattern, scope, EntryFilter::All)?
+            .into_iter()
+            .map(StorageEntry::from_existing)
+            .collect()
+    }
+
+    /// Resolve a file relative to this directory.
+    pub fn get_file(&self, relative_path: impl AsRef<Path>) -> Result<FileStorage, StorageError> {
+        let path = resolve_relative_child(&self.path, relative_path.as_ref())?;
+        FileStorage::from_existing(path)
+    }
+
+    /// Resolve a child directory relative to this directory.
+    pub fn get_directory(
+        &self,
+        relative_path: impl AsRef<Path>,
+    ) -> Result<DirectoryStorage, StorageError> {
+        let path = resolve_relative_child(&self.path, relative_path.as_ref())?;
+        DirectoryStorage::from_existing(path)
+    }
+
+    /// Start a debounced watcher for this directory.
+    pub fn watch(&self, config: StorageWatchConfig) -> Result<DirectoryWatchHandle, StorageError> {
+        DirectoryWatchHandle::watch(&self.path, config)
+    }
+
     /// Copy the directory tree to an exact destination path.
     pub fn copy_to(&self, destination: impl AsRef<Path>) -> Result<Self, StorageError> {
         let path = copy_directory(&self.path, destination)?;
@@ -122,6 +197,94 @@ impl DirectoryStorage {
     pub fn delete_with_options(&self, options: DirectoryDeleteOptions) -> Result<(), StorageError> {
         delete_directory_with_options(&self.path, options)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EntryFilter {
+    Files,
+    Directories,
+    All,
+}
+
+fn collect_matching_paths(
+    root: &Path,
+    pattern: &str,
+    scope: SearchScope,
+    filter: EntryFilter,
+) -> Result<Vec<PathBuf>, StorageError> {
+    let glob = globset::Glob::new(pattern)
+        .map_err(|_| StorageError::path_conflict(root.to_path_buf(), "invalid search pattern"))?;
+    let matcher = glob.compile_matcher();
+    let mut results = Vec::new();
+    collect_matching_paths_recursive(root, root, &matcher, scope, filter, &mut results)?;
+    results.sort();
+    Ok(results)
+}
+
+fn collect_matching_paths_recursive(
+    root: &Path,
+    current: &Path,
+    matcher: &globset::GlobMatcher,
+    scope: SearchScope,
+    filter: EntryFilter,
+    results: &mut Vec<PathBuf>,
+) -> Result<(), StorageError> {
+    for entry in
+        fs::read_dir(current).map_err(|err| StorageError::io("read directory", current, err))?
+    {
+        let entry = entry
+            .map_err(|err| StorageError::io("enumerate directory entries for", current, err))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| StorageError::io("read file type for", &path, err))?;
+        let relative = path.strip_prefix(root).unwrap_or(&path);
+        let matches = matcher.is_match(relative)
+            || relative
+                .file_name()
+                .is_some_and(|name| matcher.is_match(Path::new(name)));
+
+        if matches && include_path(file_type.is_file(), file_type.is_dir(), filter) {
+            results.push(path.clone());
+        }
+
+        if file_type.is_dir() && scope == SearchScope::AllDirectories {
+            collect_matching_paths_recursive(root, &path, matcher, scope, filter, results)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn include_path(is_file: bool, is_dir: bool, filter: EntryFilter) -> bool {
+    match filter {
+        EntryFilter::Files => is_file,
+        EntryFilter::Directories => is_dir,
+        EntryFilter::All => is_file || is_dir,
+    }
+}
+
+fn resolve_relative_child(root: &Path, relative_path: &Path) -> Result<PathBuf, StorageError> {
+    if relative_path.is_absolute() {
+        return Err(StorageError::path_conflict(
+            root.to_path_buf(),
+            "relative path must not be absolute",
+        ));
+    }
+
+    if relative_path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::Prefix(_) | Component::RootDir
+        )
+    }) {
+        return Err(StorageError::path_conflict(
+            root.to_path_buf(),
+            "relative path must stay within the directory root",
+        ));
+    }
+
+    Ok(root.join(relative_path))
 }
 
 #[cfg(feature = "async-tokio")]

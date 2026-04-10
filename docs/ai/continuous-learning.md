@@ -10,3 +10,5 @@
 - A folder-backed `info/` module tree is a better fit than a single `info.rs` file once file and directory information start diverging.
 - Progress reporting should stay opt-in and isolated so basic file operations can take the fastest direct path without pre-scans or buffered callbacks.
 - A single synchronous operations core plus optional async wrappers is easier to reason about than separate sync and async mutation implementations.
+- Directory watching belongs behind a debounced event boundary so callers get stable change notifications without inheriting raw watcher noise.
+- Shared package types between the runtime and builder are safer than re-describing the MessagePack contract in multiple crates.

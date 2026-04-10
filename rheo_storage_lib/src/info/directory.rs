@@ -104,6 +104,21 @@ impl DirectoryInfo {
             .get_or_try_init(|| scan_directory_summary(self.path()))
     }
 
+    /// Total recursive size in bytes.
+    pub fn size(&self) -> Result<u64, StorageError> {
+        Ok(self.summary()?.total_size)
+    }
+
+    /// Total recursive file count.
+    pub fn file_count(&self) -> Result<u64, StorageError> {
+        Ok(self.summary()?.file_count)
+    }
+
+    /// Total recursive subdirectory count.
+    pub fn directory_count(&self) -> Result<u64, StorageError> {
+        Ok(self.summary()?.directory_count)
+    }
+
     /// Returns a cached summary if it has already been computed.
     pub fn summary_if_loaded(&self) -> Option<&DirectorySummary> {
         self.summary.get()

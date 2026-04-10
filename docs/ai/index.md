@@ -11,5 +11,6 @@
 - [`../reference/legacy-rheo-storage.md`](../reference/legacy-rheo-storage.md): summary of the original C# feature families and migration boundaries.
 
 ## Current Focus
-- Build out content-based analysis and immutable file metadata in `rheo_storage_lib`.
-- Keep the definition builder deferred until the runtime package consumer is proven.
+- Keep `rheo_storage_lib` as the source of truth for analysis, metadata, operations, enumeration, and watching.
+- Use `rheo_storage_def_builder` to inspect and normalize the runtime package format.
+- Keep ABI layers thin: `rheo_storage_com` for classic COM consumers and `rheo_storage_winrt` for WinRT-facing packaging work.

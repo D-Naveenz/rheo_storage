@@ -60,6 +60,13 @@ pub enum StorageError {
         operation: &'static str,
         message: String,
     },
+
+    /// A storage watcher failed to initialize or deliver events.
+    #[error("watch error while attempting to {operation}: {message}")]
+    Watch {
+        operation: &'static str,
+        message: String,
+    },
 }
 
 impl StorageError {
@@ -96,6 +103,13 @@ impl StorageError {
     #[cfg(feature = "async-tokio")]
     pub(crate) fn async_runtime(operation: &'static str, message: impl Into<String>) -> Self {
         Self::AsyncRuntime {
+            operation,
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn watch(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::Watch {
             operation,
             message: message.into(),
         }

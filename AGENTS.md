@@ -20,9 +20,10 @@
 - Keep project-specific AI guidance in this repo, not in a global skill.
 
 ## Current Milestone
-- `rheo_storage_lib` owns analysis, immutable metadata, file and directory operations, typed errors, and legacy definitions loading.
+- `rheo_storage_lib` owns analysis, immutable metadata, file and directory operations, navigation, debounced watching, typed errors, and legacy definitions loading.
 - The operations layer should keep the simple path fast: do not force info or analysis loading for plain copy, move, read, write, or delete calls.
-- `rheo_storage_def_builder` is intentionally postponed until the runtime analysis and operations core is stable.
+- `rheo_storage_def_builder` owns package inspection and normalization for `filedefs.rpkg`.
+- `rheo_storage_com` and `rheo_storage_winrt` are wrapper layers over the Rust core and must stay thin.
 
 ## Working Rhythm
 - Update `docs/ai/continuous-learning.md` whenever a repeated implementation lesson appears.

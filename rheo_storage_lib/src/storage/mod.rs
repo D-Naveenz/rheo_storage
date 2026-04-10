@@ -9,6 +9,16 @@ use std::path::Path;
 use crate::error::StorageError;
 use crate::operations::common::normalize_path;
 
+/// Controls whether directory enumeration is limited to the current folder or
+/// includes nested directories recursively.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchScope {
+    /// Restrict enumeration to the current directory only.
+    TopDirectoryOnly,
+    /// Recursively enumerate the full directory tree.
+    AllDirectories,
+}
+
 /// Rust-native storage handle for an existing file-system entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StorageEntry {

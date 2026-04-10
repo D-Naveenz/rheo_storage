@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use crate::definitions::{LegacyDefinition, database};
+use crate::definitions::{DefinitionRecord, database};
 use crate::error::StorageError;
 
 const SCAN_WINDOW_SIZE: usize = 8 * 1024;
@@ -194,7 +194,7 @@ struct MatchedDefinition {
 }
 
 impl MatchedDefinition {
-    fn from_legacy(definition: &LegacyDefinition, score: u64) -> Self {
+    fn from_legacy(definition: &DefinitionRecord, score: u64) -> Self {
         Self {
             file_type_label: definition.file_type.clone(),
             mime_type: definition.mime_type.clone(),
@@ -236,7 +236,7 @@ fn compare_matches(left: &MatchedDefinition, right: &MatchedDefinition) -> Order
 }
 
 fn score_definition(
-    definition: &LegacyDefinition,
+    definition: &DefinitionRecord,
     header: &[u8],
     reader: &mut (impl Read + Seek),
     full_buffer: &mut Option<Vec<u8>>,

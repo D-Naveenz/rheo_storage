@@ -20,3 +20,8 @@
 ## Migration Boundary for Milestone One
 - The Rust rewrite uses the legacy `filedefs.rpkg` package as input only.
 - The C# implementation remains the reference for behavior ideas, not the public API shape.
+
+## Current Migration Status
+- Rust runtime coverage now includes analysis, metadata, sync/async operations, directory navigation, and debounced watching.
+- The Rust builder currently normalizes and validates the legacy package format directly rather than re-implementing the full TrID ETL pipeline.
+- Classic COM and WinRT-facing crates are wrapper layers over the Rust core, not parallel implementations.

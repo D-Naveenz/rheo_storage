@@ -1,11 +1,13 @@
 use std::fs;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use rheo_storage_lib::{
-    ContentKind, DirectoryDeleteOptions, DirectoryStorage, FileStorage, StorageEntry, StorageError,
-    TransferOptions, WriteOptions, copy_directory_with_options, copy_file_with_options,
-    move_file_with_options, read_file_to_string, write_file,
+    ContentKind, DirectoryDeleteOptions, DirectoryStorage, FileStorage, SearchScope,
+    StorageChangeType, StorageEntry, StorageError, StorageWatchConfig, TransferOptions,
+    WriteOptions, copy_directory_with_options, copy_file_with_options, move_file_with_options,
+    read_file_to_string, write_file,
 };
 use tempfile::tempdir;
 
@@ -210,6 +212,88 @@ fn write_from_reader_supports_progress_reporting() {
             .total_bytes
             .is_none()
     );
+}
+
+#[test]
+fn directory_storage_can_enumerate_and_resolve_children() {
+    let temp = tempdir().unwrap();
+    let root = temp.path().join("root");
+    fs::create_dir_all(root.join("nested")).unwrap();
+    fs::write(root.join("a.txt"), b"a").unwrap();
+    fs::write(root.join("nested").join("b.log"), b"b").unwrap();
+    let directory = DirectoryStorage::from_existing(&root).unwrap();
+
+    let top_files = directory.files().unwrap();
+    let recursive_files = directory
+        .files_matching("*", SearchScope::AllDirectories)
+        .unwrap();
+    let nested = directory.get_directory("nested").unwrap();
+    let nested_file = directory.get_file("nested/b.log").unwrap();
+
+    assert_eq!(top_files.len(), 1);
+    assert_eq!(recursive_files.len(), 2);
+    assert_eq!(nested.name(), Some("nested"));
+    assert_eq!(nested_file.name(), Some("b.log"));
+}
+
+#[test]
+fn directory_storage_matching_supports_globs() {
+    let temp = tempdir().unwrap();
+    let root = temp.path().join("root");
+    fs::create_dir_all(root.join("logs")).unwrap();
+    fs::write(root.join("one.txt"), b"1").unwrap();
+    fs::write(root.join("logs").join("two.log"), b"2").unwrap();
+    fs::write(root.join("logs").join("three.txt"), b"3").unwrap();
+    let directory = DirectoryStorage::from_existing(&root).unwrap();
+
+    let txt_files = directory
+        .files_matching("*.txt", SearchScope::AllDirectories)
+        .unwrap();
+    let log_dirs = directory
+        .directories_matching("log*", SearchScope::TopDirectoryOnly)
+        .unwrap();
+
+    assert_eq!(txt_files.len(), 2);
+    assert_eq!(log_dirs.len(), 1);
+}
+
+#[test]
+fn directory_storage_rejects_escaping_relative_paths() {
+    let temp = tempdir().unwrap();
+    let root = temp.path().join("root");
+    fs::create_dir_all(&root).unwrap();
+    let directory = DirectoryStorage::from_existing(&root).unwrap();
+
+    let err = directory.get_file("../outside.txt").unwrap_err();
+    assert!(matches!(err, StorageError::PathConflict { .. }));
+}
+
+#[test]
+fn directory_watch_reports_created_files() {
+    let temp = tempdir().unwrap();
+    let root = temp.path().join("watched");
+    fs::create_dir_all(&root).unwrap();
+    let directory = DirectoryStorage::from_existing(&root).unwrap();
+    let watcher = directory
+        .watch(StorageWatchConfig {
+            debounce_window: Duration::from_millis(100),
+            ..StorageWatchConfig::default()
+        })
+        .unwrap();
+
+    let created_file = root.join("created.txt");
+    fs::write(&created_file, b"created").unwrap();
+
+    let event = watcher
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap()
+        .expect("expected a watcher event");
+
+    assert_eq!(event.path, created_file);
+    assert!(matches!(
+        event.change_type,
+        StorageChangeType::Created | StorageChangeType::Modified
+    ));
 }
 
 #[cfg(feature = "async-tokio")]
