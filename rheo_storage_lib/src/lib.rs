@@ -3,7 +3,8 @@
 //! This crate currently focuses on the first two rewrite milestones:
 //! immutable metadata and content-based analysis backed by the legacy
 //! `filedefs.rpkg` package, plus a Rust-native file and directory operations
-//! layer with optional async wrappers.
+//! layer with optional async wrappers. The package loader supports both
+//! legacy plain MessagePack packages and the newer LZ4-wrapped `rpkg` format.
 
 pub mod analysis;
 pub mod definitions;
@@ -15,8 +16,9 @@ pub mod watch;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
 pub use definitions::{
-    DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern,
-    bundled_definition_package, decode_definition_package, encode_definition_package,
+    DefinitionPackage, DefinitionPackageDecodeError, DefinitionPackageEncodeError,
+    DefinitionRecord, SignatureDefinition, SignaturePattern, bundled_definition_package,
+    decode_definition_package, encode_definition_package, is_compressed_definition_package,
 };
 pub use error::StorageError;
 pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};

@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use rheo_storage_def_builder::{
-    build_trid_xml_package, inspect_package, inspect_trid_xml_source, load_bundled_package,
-    normalize_package, packages_match, write_package,
+    build_trid_xml_package_with_report, inspect_package, inspect_trid_xml_source,
+    load_bundled_package, normalize_package, packages_match, write_package,
 };
 
 #[derive(Debug, Parser)]
@@ -64,9 +64,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("wrote package: {}", path.display());
         }
         Command::BuildTridXml { input, output } => {
-            let package = build_trid_xml_package(&input)?;
-            let path = write_package(&package, output)?;
+            let build = build_trid_xml_package_with_report(&input)?;
+            let path = write_package(&build.package, output)?;
             println!("built package from TrID XML: {}", path.display());
+            println!("total_parsed={}", build.report.total_parsed);
+            println!("mime_corrected={}", build.report.mime_corrected);
+            println!("mime_rejected={}", build.report.mime_rejected);
+            println!("extension_rejected={}", build.report.extension_rejected);
+            println!("signature_rejected={}", build.report.signature_rejected);
+            println!("final_trimmed={}", build.report.final_trimmed);
+            println!("final_kept={}", build.report.final_kept);
         }
         Command::Inspect { input } => {
             let summary = inspect_package(input)?;
@@ -75,10 +82,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("definition_count={}", summary.definition_count);
         }
         Command::InspectTridXml { input } => {
-            let summary = inspect_trid_xml_source(input)?;
-            println!("package_version={}", summary.package_version);
-            println!("tags={}", summary.tags);
-            println!("definition_count={}", summary.definition_count);
+            let report = inspect_trid_xml_source(input)?;
+            println!("total_parsed={}", report.total_parsed);
+            println!("mime_corrected={}", report.mime_corrected);
+            println!("mime_rejected={}", report.mime_rejected);
+            println!("extension_rejected={}", report.extension_rejected);
+            println!("signature_rejected={}", report.signature_rejected);
+            println!("final_trimmed={}", report.final_trimmed);
+            println!("final_kept={}", report.final_kept);
         }
         Command::Normalize { input, output } => {
             let path = normalize_package(input, output)?;

@@ -1,24 +1,60 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use rheo_storage_lib::{
     DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern,
 };
 
-use crate::{BuilderError, PackageSummary};
+use crate::BuilderError;
 
+mod mime;
 mod model;
+mod sluice;
 mod source;
 
-const LEGACY_VALIDATED_TAGS: u32 = 48;
+use mime::mime_catalog;
+use sluice::{SluiceCandidate, extension_seeds};
 
-/// Build a `filedefs.rpkg`-compatible package from a TrID XML source.
+const PACKAGE_VERSION: &str = "";
+const VALIDATED_TAGS: u32 = 48;
+const TARGET_DEFINITION_COUNT: usize = 5_500;
+
+/// Diagnostics produced while transforming TrID XML definitions into an `rpkg`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TridTransformReport {
+    /// Total parsed TrID definitions before validation.
+    pub total_parsed: usize,
+    /// Definitions whose MIME type was repaired to a canonical value.
+    pub mime_corrected: usize,
+    /// Definitions rejected because the MIME type could not be recognized.
+    pub mime_rejected: usize,
+    /// Definitions rejected because no seeded common extension survived.
+    pub extension_rejected: usize,
+    /// Definitions rejected because they had no usable signature patterns.
+    pub signature_rejected: usize,
+    /// Definitions trimmed after ranking to keep the reduced package focused.
+    pub final_trimmed: usize,
+    /// Final number of definitions emitted into the package.
+    pub final_kept: usize,
+}
+
+/// The result of building an `rpkg` from TrID XML definitions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TridBuildOutput {
+    /// The transformed definitions package.
+    pub package: DefinitionPackage,
+    /// Diagnostics describing how the package was produced.
+    pub report: TridTransformReport,
+}
+
+/// Build a reduced `filedefs.rpkg` package from a TrID XML source.
 ///
 /// The source may be a single `.xml` definition file, a directory that contains
 /// extracted TrID XML definitions, or a `.7z` archive containing the XML tree.
 ///
 /// # Returns
 ///
-/// - `Result<DefinitionPackage, BuilderError>` - A package compatible with `rheo_storage_lib`.
+/// - `Result<DefinitionPackage, BuilderError>` - A reduced package compatible with `rheo_storage_lib`.
 ///
 /// # Errors
 ///
@@ -33,34 +69,90 @@ const LEGACY_VALIDATED_TAGS: u32 = 48;
 /// let _ = build_trid_xml_package("temp/trid-defs/triddefs_xml.7z");
 /// ```
 pub fn build_trid_xml_package(source: impl AsRef<Path>) -> Result<DefinitionPackage, BuilderError> {
-    let definitions = source::load_trid_definitions(source.as_ref())?
-        .into_iter()
-        .map(ParsedTridDefinition::into_definition_record)
-        .collect::<Vec<_>>();
+    Ok(build_trid_xml_package_with_report(source)?.package)
+}
 
-    let mut package = DefinitionPackage {
-        package_version: String::new(),
-        tags: LEGACY_VALIDATED_TAGS,
-        definitions,
+/// Build a reduced `filedefs.rpkg` package from a TrID XML source and return diagnostics.
+///
+/// # Returns
+///
+/// - `Result<TridBuildOutput, BuilderError>` - The reduced package and transformation report.
+///
+/// # Errors
+///
+/// Returns an error when the source cannot be transformed successfully.
+pub fn build_trid_xml_package_with_report(
+    source: impl AsRef<Path>,
+) -> Result<TridBuildOutput, BuilderError> {
+    let parsed = source::load_trid_definitions(source.as_ref())?;
+    let mut report = TridTransformReport {
+        total_parsed: parsed.len(),
+        ..TridTransformReport::default()
     };
-    package.definitions.sort_by(|left, right| {
+
+    let mut mime_cache = HashMap::new();
+    let mut survivors = Vec::new();
+    let catalog = mime_catalog();
+    let seeds = extension_seeds();
+
+    for definition in parsed {
+        if definition.signature.patterns.is_empty() {
+            report.signature_rejected += 1;
+            continue;
+        }
+
+        let Some(level) = seeds.best_level(&definition.extensions) else {
+            report.extension_rejected += 1;
+            continue;
+        };
+
+        let raw_mime = definition.mime_type.clone();
+        let Some(mime) = catalog.canonicalize(&raw_mime, &mut mime_cache) else {
+            report.mime_rejected += 1;
+            continue;
+        };
+
+        if raw_mime.trim().to_ascii_lowercase() != mime.canonical {
+            report.mime_corrected += 1;
+        }
+
+        survivors.push(SluiceCandidate::from_definition(definition, level, &mime));
+    }
+
+    survivors.sort_by(|left, right| {
         right
-            .priority_level
-            .cmp(&left.priority_level)
-            .then_with(|| left.file_type.cmp(&right.file_type))
-            .then_with(|| left.mime_type.cmp(&right.mime_type))
-            .then_with(|| left.extensions.cmp(&right.extensions))
-            .then_with(|| left.remarks.cmp(&right.remarks))
+            .score
+            .cmp(&left.score)
+            .then_with(|| left.level.cmp(&right.level))
+            .then_with(|| left.definition.file_type.cmp(&right.definition.file_type))
+            .then_with(|| left.definition.mime_type.cmp(&right.definition.mime_type))
+            .then_with(|| left.definition.extensions.cmp(&right.definition.extensions))
+            .then_with(|| left.definition.remarks.cmp(&right.definition.remarks))
     });
 
-    Ok(package)
+    if survivors.len() > TARGET_DEFINITION_COUNT {
+        report.final_trimmed = survivors.len() - TARGET_DEFINITION_COUNT;
+        survivors.truncate(TARGET_DEFINITION_COUNT);
+    }
+    report.final_kept = survivors.len();
+
+    let package = DefinitionPackage {
+        package_version: PACKAGE_VERSION.to_string(),
+        tags: VALIDATED_TAGS,
+        definitions: survivors
+            .into_iter()
+            .map(candidate_to_record)
+            .collect::<Vec<_>>(),
+    };
+
+    Ok(TridBuildOutput { package, report })
 }
 
 /// Inspect a TrID XML source without writing a package file.
 ///
 /// # Returns
 ///
-/// - `Result<PackageSummary, BuilderError>` - Summary metadata for the generated package.
+/// - `Result<TridTransformReport, BuilderError>` - Diagnostics for the transformed package.
 ///
 /// # Errors
 ///
@@ -73,9 +165,10 @@ pub fn build_trid_xml_package(source: impl AsRef<Path>) -> Result<DefinitionPack
 ///
 /// let _ = inspect_trid_xml_source("temp/trid-defs/triddefs_xml.7z");
 /// ```
-pub fn inspect_trid_xml_source(source: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
-    let package = build_trid_xml_package(source)?;
-    Ok(PackageSummary::from_package(&package))
+pub fn inspect_trid_xml_source(
+    source: impl AsRef<Path>,
+) -> Result<TridTransformReport, BuilderError> {
+    Ok(build_trid_xml_package_with_report(source)?.report)
 }
 
 #[derive(Debug, Clone)]
@@ -100,40 +193,25 @@ pub(crate) struct ParsedTridDefinition {
     pub(crate) file_count: u32,
 }
 
-impl ParsedTridDefinition {
-    fn into_definition_record(self) -> DefinitionRecord {
-        let priority_level = calculate_priority(
-            self.file_count,
-            self.signature.patterns.len(),
-            self.signature.strings.len(),
-        );
-
-        DefinitionRecord {
-            file_type: self.file_type,
-            extensions: self.extensions,
-            mime_type: self.mime_type,
-            remarks: self.remarks,
-            signature: SignatureDefinition {
-                patterns: self
-                    .signature
-                    .patterns
-                    .into_iter()
-                    .map(|pattern| SignaturePattern {
-                        position: pattern.position,
-                        data: pattern.data,
-                    })
-                    .collect(),
-                strings: self.signature.strings,
-            },
-            priority_level,
-        }
+fn candidate_to_record(candidate: SluiceCandidate) -> DefinitionRecord {
+    DefinitionRecord {
+        file_type: candidate.definition.file_type,
+        extensions: candidate.definition.extensions,
+        mime_type: candidate.canonical_mime,
+        remarks: candidate.definition.remarks,
+        signature: SignatureDefinition {
+            patterns: candidate
+                .definition
+                .signature
+                .patterns
+                .into_iter()
+                .map(|pattern| SignaturePattern {
+                    position: pattern.position,
+                    data: pattern.data,
+                })
+                .collect(),
+            strings: candidate.definition.signature.strings,
+        },
+        priority_level: candidate.score,
     }
-}
-
-fn calculate_priority(file_count: u32, pattern_count: usize, string_count: usize) -> i32 {
-    let pattern_score = pattern_count as i32 * 10;
-    let string_score = string_count as i32 * 4;
-    let identifiability_bonus = if pattern_count > 0 { 25 } else { 0 };
-
-    file_count.min(i32::MAX as u32) as i32 + pattern_score + string_score + identifiability_bonus
 }

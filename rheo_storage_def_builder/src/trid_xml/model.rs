@@ -250,4 +250,31 @@ mod tests {
         );
         assert_eq!(parsed.signature.strings, vec![b"IHDR".to_vec()]);
     }
+
+    #[test]
+    fn split_extensions_normalizes_slash_separated_values() {
+        let xml = r#"
+<TrID ver="2.00">
+    <Info>
+        <FileType>Disc Image</FileType>
+        <Ext>ISO/UDF/.IMG</Ext>
+        <Mime>application/x-udf-image</Mime>
+    </Info>
+    <General>
+        <FileNum>12</FileNum>
+    </General>
+    <FrontBlock>
+        <Pattern>
+            <Bytes>41424344</Bytes>
+            <Pos>0</Pos>
+        </Pattern>
+    </FrontBlock>
+</TrID>
+"#;
+
+        let parsed =
+            parse_trid_xml_definition(xml, "fixture.trid.xml".as_ref()).expect("xml should parse");
+
+        assert_eq!(parsed.extensions, vec!["iso", "udf", "img"]);
+    }
 }

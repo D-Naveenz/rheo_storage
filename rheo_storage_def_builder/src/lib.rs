@@ -9,7 +9,10 @@ use thiserror::Error;
 
 mod trid_xml;
 
-pub use trid_xml::{build_trid_xml_package, inspect_trid_xml_source};
+pub use trid_xml::{
+    TridBuildOutput, TridTransformReport, build_trid_xml_package,
+    build_trid_xml_package_with_report, inspect_trid_xml_source,
+};
 
 /// Errors produced by the definitions builder crate.
 #[derive(Debug, Error)]
@@ -134,7 +137,7 @@ pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
         })
 }
 
-/// Write a normalized package to disk in the legacy MessagePack format.
+/// Write a package to disk in the default compressed `rpkg` format.
 ///
 /// # Returns
 ///
@@ -143,7 +146,7 @@ pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
 /// # Errors
 ///
 /// Returns [`BuilderError::Io`] when the output path cannot be created or written,
-/// or [`BuilderError::Package`] when serialization fails.
+/// or [`BuilderError::Package`] when serialization or compression fails.
 ///
 /// # Examples
 ///
