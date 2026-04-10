@@ -7,6 +7,16 @@ Rust-first rewrite of `Rheo.Storage`.
 - `rheo_storage_def_builder`: definitions package builder, validator, and normalization tool
 - `rheo_storage_winrt`: WinRT-facing wrapper crate for packaged Windows consumers
 
+## Builder Package Assets
+- `rheo_storage_def_builder/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
+- That folder is excluded from Cargo package publishing, but `rheo_storage_def_builder` copies it into the active Cargo output directory during build.
+- The copy target mirrors MSBuild-style output behavior, so after building you can expect `target/debug/package` or `target/release/package` beside the builder executable.
+- The builder now uses executable-relative defaults:
+  - `package/` for TrID source discovery
+  - `output/` for generated `filedefs.rpkg`
+  - `logs/` for `rheo_storage_def_builder.log`
+- All three locations can still be overridden from the CLI with `--package-dir`, `--output-dir`, and `--logs-dir`, or by passing explicit `--input` and `--output` paths on commands that support them.
+
 ## Consumer Docs
 - [Rust consumer](./docs/reference/rust-consumer.md)
 - [WinRT consumer](./docs/reference/winrt-consumer.md)

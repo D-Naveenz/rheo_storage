@@ -1,11 +1,28 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use tempfile::tempdir;
 
 fn fixtures_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
         .join("trid_xml")
+}
+
+fn copy_fixture_tree(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).unwrap();
+    for entry in fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_fixture_tree(&source_path, &destination_path);
+        } else {
+            fs::copy(&source_path, &destination_path).unwrap();
+        }
+    }
 }
 
 #[test]
@@ -57,4 +74,30 @@ fn silent_mode_suppresses_normal_output() {
         output.stderr.is_empty(),
         "stderr should be empty in silent mode"
     );
+}
+
+#[test]
+fn default_package_output_and_logs_directories_are_used() {
+    let temp = tempdir().unwrap();
+    let package_dir = temp.path().join("package");
+    copy_fixture_tree(&fixtures_root().join("defs"), &package_dir.join("defs"));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rheo_storage_def_builder"))
+        .env("RHEO_STORAGE_DEF_BUILDER_BASE_DIR", temp.path())
+        .arg("build-trid-xml")
+        .output()
+        .expect("builder CLI should run");
+
+    assert!(output.status.success(), "command should succeed");
+    assert!(temp.path().join("output").join("filedefs.rpkg").exists());
+    assert!(
+        temp.path()
+            .join("logs")
+            .join("rheo_storage_def_builder.log")
+            .exists()
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Build Complete"));
+    assert!(stdout.contains("Log"));
 }
