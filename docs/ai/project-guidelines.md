@@ -13,16 +13,24 @@
   - text vs binary fallback heuristics
   - immutable file metadata
   - deterministic tests
+
+## Milestone Two Scope
+- Include:
+  - sync file operations
+  - optional-feature async wrappers for file and directory operations
+  - progress reporting only when callers opt in
+  - path-based storage handles that layer cleanly over the operation core
+  - recursive directory copy, move, and delete
 - Exclude:
-  - mutating file operations
-  - directory recursion APIs
   - watchers and debouncing
-  - Win32 shell metadata
+  - transactional definitions building
   - .NET interop and exported DLL design
+  - operation-triggered metadata or analysis loading unless the caller requests it
 
 ## Windows-First Guardrails
 - Use shared file-opening behavior on Windows so analysis does not create avoidable locking failures.
 - Keep OS-specific code isolated at the boundary. The detection engine itself should stay portable.
+- Prefer same-volume rename moves for the fast path, and only fall back to copy/delete when a cross-volume move requires it.
 
 ## Documentation Split
 - Use rustdoc comments for public Rust items.
@@ -33,3 +41,4 @@
 - Prefer small, deterministic fixtures.
 - Test behavior that matters to API consumers: ranking, fallback, MIME/extension selection, and Windows sharing behavior.
 - Add new fixture files only when they improve clarity more than in-test byte literals would.
+- For mutation APIs, verify both the low-overhead default path and the progress-enabled path.

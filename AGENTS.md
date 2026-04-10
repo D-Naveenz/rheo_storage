@@ -20,8 +20,9 @@
 - Keep project-specific AI guidance in this repo, not in a global skill.
 
 ## Current Milestone
-- `rheo_storage_lib` owns analysis, immutable metadata, error types, and legacy definitions loading.
-- `rheo_storage_def_builder` is intentionally postponed until the runtime analysis core is stable.
+- `rheo_storage_lib` owns analysis, immutable metadata, file and directory operations, typed errors, and legacy definitions loading.
+- The operations layer should keep the simple path fast: do not force info or analysis loading for plain copy, move, read, write, or delete calls.
+- `rheo_storage_def_builder` is intentionally postponed until the runtime analysis and operations core is stable.
 
 ## Working Rhythm
 - Update `docs/ai/continuous-learning.md` whenever a repeated implementation lesson appears.

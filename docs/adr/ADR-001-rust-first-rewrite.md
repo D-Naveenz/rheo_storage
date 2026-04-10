@@ -10,9 +10,11 @@ Accepted
 - Build a Rust-native public API rather than mirroring the C# object model.
 - Optimize for Windows first while keeping the pure analysis engine portable.
 - Start with content-based analysis and immutable metadata before any mutating file or directory features.
+- Once mutation APIs are added, keep a single synchronous core and layer optional async wrappers over it instead of maintaining duplicate behavior trees.
 - Defer FFI and exported DLL concerns until the Rust core is stable and worth wrapping.
 
 ## Consequences
 - Early milestones can focus on correctness and ergonomics without carrying legacy API constraints.
 - The runtime library can reuse the legacy definitions asset immediately, while the Rust definitions builder is postponed.
-- Future milestones may add mutation APIs, watchers, and builder tooling, but each must fit the Rust-first architecture rather than force a class-for-class port.
+- Mutation APIs should keep the simple path cheap by avoiding implicit info or analysis loading.
+- Future milestones may add watchers and builder tooling, but each must fit the Rust-first architecture rather than force a class-for-class port.

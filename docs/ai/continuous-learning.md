@@ -8,3 +8,5 @@
 ## 2026-04-10
 - File metadata should stay cheap by default; content analysis belongs behind a lazy cache instead of inside `FileInfo::from_path`.
 - A folder-backed `info/` module tree is a better fit than a single `info.rs` file once file and directory information start diverging.
+- Progress reporting should stay opt-in and isolated so basic file operations can take the fastest direct path without pre-scans or buffered callbacks.
+- A single synchronous operations core plus optional async wrappers is easier to reason about than separate sync and async mutation implementations.
