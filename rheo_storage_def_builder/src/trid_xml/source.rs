@@ -9,7 +9,8 @@ use tracing::{debug, info};
 use crate::builder::BuilderError;
 
 use super::{
-    ParsedTridDefinition, TridBuildProgress, TridBuildStage, model::parse_trid_xml_definition,
+    ParsedTridDefinition, TridBuildProgress, TridBuildStage, TridBuildStats,
+    model::parse_trid_xml_definition,
 };
 
 pub(crate) fn load_trid_definitions(
@@ -58,6 +59,8 @@ fn load_from_directory(
         message: "Parsing XML definitions".to_string(),
         current: 0,
         total: Some(xml_files.len()),
+        current_item: None,
+        stats: TridBuildStats::default(),
     });
 
     let total_files = xml_files.len();
@@ -71,9 +74,16 @@ fn load_from_directory(
         definitions.push(parse_trid_xml_definition(&xml, &xml_file)?);
         progress(TridBuildProgress {
             stage: TridBuildStage::ParseDefinitions,
-            message: "Parsing XML definitions".to_string(),
+            message: "Parsing XML definition".to_string(),
             current: index + 1,
             total: Some(total_files),
+            current_item: xml_file
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string()),
+            stats: TridBuildStats {
+                parsed_count: index + 1,
+                ..TridBuildStats::default()
+            },
         });
     }
     info!(
@@ -93,6 +103,8 @@ fn load_from_archive(
         message: format!("Extracting {}", source.display()),
         current: 0,
         total: None,
+        current_item: Some(source.display().to_string()),
+        stats: TridBuildStats::default(),
     });
     let extraction_dir = extract_archive(source)?;
     load_from_directory(extraction_dir.path(), progress)

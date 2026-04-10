@@ -44,6 +44,29 @@ pub struct TridBuildProgress {
     pub current: usize,
     /// Total units expected for the current stage when known.
     pub total: Option<usize>,
+    /// The file or definition currently being processed when available.
+    pub current_item: Option<String>,
+    /// Live counters collected while the build is running.
+    pub stats: TridBuildStats,
+}
+
+/// Live counters exposed during TrID package building.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TridBuildStats {
+    /// Number of parsed XML definitions discovered so far.
+    pub parsed_count: usize,
+    /// Number of accepted definitions that survived validation.
+    pub accepted_count: usize,
+    /// Number of MIME values corrected to a canonical value.
+    pub mime_corrected: usize,
+    /// Number of definitions rejected because their MIME could not be recognized.
+    pub mime_rejected: usize,
+    /// Number of definitions rejected because their extensions were filtered out.
+    pub extension_rejected: usize,
+    /// Number of definitions rejected because no signature patterns were available.
+    pub signature_rejected: usize,
+    /// Number of definitions trimmed after ranking.
+    pub final_trimmed: usize,
 }
 
 /// Diagnostics produced while transforming TrID XML definitions into an `rpkg`.
@@ -143,6 +166,8 @@ fn build_trid_xml_package_with_report_internal(
         message: format!("Loading source {}", source.display()),
         current: 0,
         total: None,
+        current_item: Some(source.display().to_string()),
+        stats: TridBuildStats::default(),
     });
     let parsed = source::load_trid_definitions(source, progress)?;
     let mut report = TridTransformReport {
@@ -154,6 +179,11 @@ fn build_trid_xml_package_with_report_internal(
         message: "Reducing validated definitions".to_string(),
         current: 0,
         total: Some(report.total_parsed),
+        current_item: None,
+        stats: TridBuildStats {
+            parsed_count: report.total_parsed,
+            ..TridBuildStats::default()
+        },
     });
 
     let mut mime_cache = HashMap::new();
@@ -166,9 +196,19 @@ fn build_trid_xml_package_with_report_internal(
             report.signature_rejected += 1;
             progress(TridBuildProgress {
                 stage: TridBuildStage::ReduceDefinitions,
-                message: "Reducing validated definitions".to_string(),
+                message: "Rejecting definition without patterns".to_string(),
                 current: index + 1,
                 total: Some(report.total_parsed),
+                current_item: Some(definition.file_type.clone()),
+                stats: TridBuildStats {
+                    parsed_count: report.total_parsed,
+                    accepted_count: survivors.len(),
+                    mime_corrected: report.mime_corrected,
+                    mime_rejected: report.mime_rejected,
+                    extension_rejected: report.extension_rejected,
+                    signature_rejected: report.signature_rejected,
+                    final_trimmed: report.final_trimmed,
+                },
             });
             continue;
         }
@@ -177,9 +217,19 @@ fn build_trid_xml_package_with_report_internal(
             report.extension_rejected += 1;
             progress(TridBuildProgress {
                 stage: TridBuildStage::ReduceDefinitions,
-                message: "Reducing validated definitions".to_string(),
+                message: "Rejecting definition by extension floodgate".to_string(),
                 current: index + 1,
                 total: Some(report.total_parsed),
+                current_item: Some(definition.file_type.clone()),
+                stats: TridBuildStats {
+                    parsed_count: report.total_parsed,
+                    accepted_count: survivors.len(),
+                    mime_corrected: report.mime_corrected,
+                    mime_rejected: report.mime_rejected,
+                    extension_rejected: report.extension_rejected,
+                    signature_rejected: report.signature_rejected,
+                    final_trimmed: report.final_trimmed,
+                },
             });
             continue;
         };
@@ -189,9 +239,19 @@ fn build_trid_xml_package_with_report_internal(
             report.mime_rejected += 1;
             progress(TridBuildProgress {
                 stage: TridBuildStage::ReduceDefinitions,
-                message: "Reducing validated definitions".to_string(),
+                message: "Rejecting definition by MIME validation".to_string(),
                 current: index + 1,
                 total: Some(report.total_parsed),
+                current_item: Some(definition.file_type.clone()),
+                stats: TridBuildStats {
+                    parsed_count: report.total_parsed,
+                    accepted_count: survivors.len(),
+                    mime_corrected: report.mime_corrected,
+                    mime_rejected: report.mime_rejected,
+                    extension_rejected: report.extension_rejected,
+                    signature_rejected: report.signature_rejected,
+                    final_trimmed: report.final_trimmed,
+                },
             });
             continue;
         };
@@ -200,12 +260,23 @@ fn build_trid_xml_package_with_report_internal(
             report.mime_corrected += 1;
         }
 
+        let current_item = definition.file_type.clone();
         survivors.push(SluiceCandidate::from_definition(definition, level, &mime));
         progress(TridBuildProgress {
             stage: TridBuildStage::ReduceDefinitions,
-            message: "Reducing validated definitions".to_string(),
+            message: "Accepting validated definition".to_string(),
             current: index + 1,
             total: Some(report.total_parsed),
+            current_item: Some(current_item),
+            stats: TridBuildStats {
+                parsed_count: report.total_parsed,
+                accepted_count: survivors.len(),
+                mime_corrected: report.mime_corrected,
+                mime_rejected: report.mime_rejected,
+                extension_rejected: report.extension_rejected,
+                signature_rejected: report.signature_rejected,
+                final_trimmed: report.final_trimmed,
+            },
         });
     }
 
@@ -240,6 +311,16 @@ fn build_trid_xml_package_with_report_internal(
         message: "Finalizing reduced package".to_string(),
         current: report.final_kept,
         total: Some(report.final_kept),
+        current_item: None,
+        stats: TridBuildStats {
+            parsed_count: report.total_parsed,
+            accepted_count: report.final_kept,
+            mime_corrected: report.mime_corrected,
+            mime_rejected: report.mime_rejected,
+            extension_rejected: report.extension_rejected,
+            signature_rejected: report.signature_rejected,
+            final_trimmed: report.final_trimmed,
+        },
     });
     info!(
         final_kept = report.final_kept,

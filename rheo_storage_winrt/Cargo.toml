@@ -1,10 +1,20 @@
 [package]
 name = "rheo_storage_winrt"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Thin WinRT-facing wrapper crate over the Rheo Storage Rust core."
+readme = "README.md"
+documentation = "https://github.com/D-Naveenz/rheo_storage/tree/main/rheo_storage_winrt"
+keywords = ["windows", "winrt", "storage", "filesystem", "abi"]
+categories = ["os::windows-apis", "filesystem"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 rheo_storage = { path = "../rheo_storage" }

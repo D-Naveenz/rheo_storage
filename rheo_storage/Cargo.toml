@@ -1,10 +1,17 @@
 [package]
 name = "rheo_storage"
-version = "0.1.0"
-description = "Lib"
-authors = ["Naveen Dharmathunga <dasheenaveen@outlook.com>"]
-license = "Apache-2.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Rust-first file analysis, metadata, and storage operations for Windows-focused applications."
+readme = "README.md"
+documentation = "https://docs.rs/rheo_storage"
+keywords = ["storage", "filesystem", "analysis", "mime", "windows"]
+categories = ["filesystem", "os::windows-apis", "encoding"]
 
 [lib]
 crate-type = ["rlib"]

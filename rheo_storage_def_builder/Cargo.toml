@@ -1,10 +1,17 @@
 [package]
 name = "rheo_storage_def_builder"
-version = "0.1.0"
-description = "CLI"
-authors = ["Naveen Dharmathunga <dasheenaveen@outlook.com>"]
-license = "Apache-2.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Interactive and scriptable builder for Rheo definitions packages from TrID XML sources."
+readme = "README.md"
+documentation = "https://github.com/D-Naveenz/rheo_storage/tree/main/rheo_storage_def_builder"
+keywords = ["trid", "definitions", "messagepack", "lz4", "cli"]
+categories = ["command-line-utilities", "filesystem", "encoding"]
 exclude = ["/package"]
 
 [dependencies]
