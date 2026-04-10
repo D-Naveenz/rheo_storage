@@ -7,5 +7,5 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rheo_storage_lib = { path = "../rheo_storage_lib" }
+rheo_storage = { path = "../rheo_storage" }
 windows = { version = "0.62", features = ["Foundation"] }

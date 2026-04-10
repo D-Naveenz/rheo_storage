@@ -20,7 +20,7 @@
 - Keep project-specific AI guidance in this repo, not in a global skill.
 
 ## Current Milestone
-- `rheo_storage_lib` owns analysis, immutable metadata, file and directory operations, navigation, debounced watching, typed errors, and legacy definitions loading.
+- `rheo_storage` owns analysis, immutable metadata, file and directory operations, navigation, debounced watching, typed errors, and legacy definitions loading.
 - The operations layer should keep the simple path fast: do not force info or analysis loading for plain copy, move, read, write, or delete calls.
 - `rheo_storage_def_builder` owns package inspection, normalization, vendored MIME validation, floodgate reduction, and TrID XML source ingestion from `.xml`, extracted directories, and `.7z` archives.
 - `filedefs.rpkg` now supports dual-read package loading: legacy plain MessagePack and the newer Rheo LZ4-wrapped format.

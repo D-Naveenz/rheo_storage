@@ -3,7 +3,7 @@
 Rust-first rewrite of `Rheo.Storage`.
 
 ## Workspace
-- `rheo_storage_lib`: core runtime library
+- `rheo_storage`: core runtime library
 - `rheo_storage_def_builder`: definitions package builder, validator, and normalization tool
 - `rheo_storage_winrt`: WinRT-facing wrapper crate for packaged Windows consumers
 

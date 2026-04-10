@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "rheo_storage_lib",
+    "rheo_storage",
     "rheo_storage_def_builder",
     "rheo_storage_winrt",
 ]

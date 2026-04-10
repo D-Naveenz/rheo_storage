@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rheo_storage_lib::{
+use rheo_storage::{
     DefinitionPackage, bundled_definition_package, decode_definition_package,
     encode_definition_package,
 };
@@ -113,7 +113,7 @@ pub fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, Builder
     })
 }
 
-/// Load the runtime package embedded in `rheo_storage_lib`.
+/// Load the runtime package embedded in `rheo_storage`.
 ///
 /// # Returns
 ///

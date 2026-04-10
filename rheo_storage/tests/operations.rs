@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use rheo_storage_lib::{
+use rheo_storage::{
     ContentKind, DirectoryDeleteOptions, DirectoryStorage, FileStorage, SearchScope,
     StorageChangeType, StorageEntry, StorageError, StorageWatchConfig, TransferOptions,
     WriteOptions, copy_directory_with_options, copy_file_with_options, move_file_with_options,

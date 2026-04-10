@@ -2,12 +2,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use rheo_storage::decode_definition_package;
+use rheo_storage::definitions::is_compressed_definition_package;
 use rheo_storage_def_builder::{
     build_trid_xml_package, build_trid_xml_package_with_report, inspect_trid_xml_source,
     write_package,
 };
-use rheo_storage_lib::decode_definition_package;
-use rheo_storage_lib::definitions::is_compressed_definition_package;
 use tempfile::tempdir;
 
 fn fixtures_root() -> PathBuf {

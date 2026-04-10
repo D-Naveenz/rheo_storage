@@ -1,10 +1,10 @@
 //! WinRT-facing wrapper crate for Rheo.Storage.
 //!
-//! This crate intentionally stays thin over `rheo_storage_lib`. The current
+//! This crate intentionally stays thin over `rheo_storage`. The current
 //! implementation provides documented Rust-side wrapper types that can be used
 //! as the basis for a packaged Windows Runtime component surface.
 
-use rheo_storage_lib::{DirectoryStorage, FileStorage, StorageError};
+use rheo_storage::{DirectoryStorage, FileStorage, StorageError};
 
 /// WinRT-oriented wrapper for file operations.
 #[derive(Debug, Clone)]

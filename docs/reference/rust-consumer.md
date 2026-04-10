@@ -1,6 +1,6 @@
 # Rust Consumer Guide
 
-Use `rheo_storage_lib` directly when your application is already written in Rust.
+Use `rheo_storage` directly when your application is already written in Rust.
 
 ## Typical Flow
 - Use `FileStorage` and `DirectoryStorage` for path-based operations.

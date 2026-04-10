@@ -2,7 +2,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
-use rheo_storage_lib::{
+use rheo_storage::{
     ContentKind, DirectoryInfo, FileInfo, StorageError, analyze_path, analyze_reader,
 };
 use tempfile::tempdir;

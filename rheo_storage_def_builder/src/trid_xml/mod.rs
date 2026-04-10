@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use rheo_storage_lib::{
-    DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern,
-};
+use rheo_storage::{DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern};
 use tracing::{debug, info};
 
 use crate::BuilderError;
@@ -83,7 +81,7 @@ pub struct TridBuildOutput {
 ///
 /// # Returns
 ///
-/// - `Result<DefinitionPackage, BuilderError>` - A reduced package compatible with `rheo_storage_lib`.
+/// - `Result<DefinitionPackage, BuilderError>` - A reduced package compatible with `rheo_storage`.
 ///
 /// # Errors
 ///

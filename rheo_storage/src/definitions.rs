@@ -263,7 +263,7 @@ pub fn is_compressed_definition_package(bytes: &[u8]) -> bool {
     bytes.starts_with(RPKG_LZ4_MAGIC)
 }
 
-/// Load the embedded definitions package bundled with `rheo_storage_lib`.
+/// Load the embedded definitions package bundled with `rheo_storage`.
 ///
 /// # Returns
 ///
