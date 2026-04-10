@@ -8,7 +8,7 @@ use crate::error::StorageError;
 
 const LEGACY_FILEDEFS_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../temp/rheo-storage/Rheo.Storage/Assets/filedefs.rpkg"
+    "/resources/filedefs.rpkg"
 ));
 const CATCH_ALL_INDEX: usize = 256;
 
@@ -117,4 +117,35 @@ pub(crate) fn database() -> Result<&'static DefinitionDatabase, StorageError> {
         .map_err(|message| StorageError::DefinitionsLoad {
             message: message.clone(),
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::database;
+
+    #[test]
+    fn legacy_rpkg_loads_successfully() {
+        let db = database().expect("legacy definitions package should deserialize");
+        assert!(!db.definitions.is_empty());
+    }
+
+    #[test]
+    fn png_header_returns_png_candidate() {
+        let db = database().expect("legacy definitions package should deserialize");
+        let header = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+
+        let candidates = db
+            .candidate_indices(&header)
+            .into_iter()
+            .map(|idx| db.definition(idx))
+            .collect::<Vec<_>>();
+
+        assert!(!candidates.is_empty());
+        assert!(candidates.iter().any(|definition| {
+            definition
+                .extensions
+                .iter()
+                .any(|ext| ext.eq_ignore_ascii_case("png") || ext.eq_ignore_ascii_case(".png"))
+        }));
+    }
 }

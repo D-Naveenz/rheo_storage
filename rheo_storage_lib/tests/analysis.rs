@@ -1,8 +1,16 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{Cursor, Write};
+use std::path::PathBuf;
 
 use rheo_storage_lib::{ContentKind, FileInfo, StorageError, analyze_path, analyze_reader};
 use tempfile::tempdir;
+
+fn fixture_path(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join(name)
+}
 
 #[test]
 fn analyze_path_missing_file_returns_not_found() {
@@ -37,6 +45,7 @@ fn analyze_reader_detects_png_signature() {
 
     assert!(!report.matches.is_empty());
     assert_eq!(report.top_detected_extension.as_deref(), Some("png"));
+    assert_eq!(report.top_mime_type.as_deref(), Some("image/png"));
     assert_eq!(report.content_kind, ContentKind::Binary);
 }
 
@@ -59,11 +68,18 @@ fn analyze_reader_detects_zip_signature() {
 
 #[test]
 fn analyze_reader_detects_pdf_signature() {
-    let cursor = Cursor::new(b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n".to_vec());
+    let report = analyze_path(fixture_path("sample-2.pdf")).unwrap();
 
-    let report = analyze_reader(cursor, Some(std::path::Path::new("sample.pdf"))).unwrap();
-
+    assert_eq!(report.top_mime_type.as_deref(), Some("application/pdf"));
     assert_eq!(report.top_detected_extension.as_deref(), Some("pdf"));
+    assert_eq!(report.content_kind, ContentKind::Binary);
+}
+
+#[test]
+fn analyze_path_detects_real_mp4_fixture() {
+    let report = analyze_path(fixture_path("sample-4.mp4")).unwrap();
+
+    assert_eq!(report.top_detected_extension.as_deref(), Some("mp4"));
     assert_eq!(report.content_kind, ContentKind::Binary);
 }
 
@@ -86,6 +102,15 @@ fn analyze_reader_detects_utf8_bom_text() {
 
     assert_eq!(report.content_kind, ContentKind::Text);
     assert_eq!(report.top_mime_type.as_deref(), Some("text/plain"));
+}
+
+#[test]
+fn analyze_reader_normalizes_source_extension() {
+    let cursor = Cursor::new(b"plain text".to_vec());
+
+    let report = analyze_reader(cursor, Some(std::path::Path::new("README.TXT"))).unwrap();
+
+    assert_eq!(report.source_extension.as_deref(), Some("txt"));
 }
 
 #[test]
@@ -152,4 +177,12 @@ fn file_info_from_path_exposes_rust_native_metadata() {
     assert_eq!(info.mime_type.as_deref(), Some("text/plain"));
     assert_eq!(info.content_kind, ContentKind::Text);
     assert_eq!(info.size, 15);
+}
+
+#[test]
+fn file_info_from_path_rejects_directories() {
+    let temp = tempdir().unwrap();
+
+    let err = FileInfo::from_path(temp.path()).unwrap_err();
+    assert!(matches!(err, StorageError::NotAFile { .. }));
 }
