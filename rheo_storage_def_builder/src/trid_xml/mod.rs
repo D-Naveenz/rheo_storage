@@ -4,6 +4,7 @@ use std::path::Path;
 use rheo_storage_lib::{
     DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern,
 };
+use tracing::{debug, info};
 
 use crate::BuilderError;
 
@@ -18,6 +19,34 @@ use sluice::{SluiceCandidate, extension_seeds};
 const PACKAGE_VERSION: &str = "";
 const VALIDATED_TAGS: u32 = 48;
 const TARGET_DEFINITION_COUNT: usize = 5_500;
+
+/// Progress stages emitted while transforming TrID XML into a reduced package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TridBuildStage {
+    /// Reading the source path and deciding how to load it.
+    LoadSource,
+    /// Extracting a `.7z` archive into a temporary directory.
+    ExtractArchive,
+    /// Parsing XML definitions from the source.
+    ParseDefinitions,
+    /// Validating and correcting MIME types and extension eligibility.
+    ReduceDefinitions,
+    /// Ordering and trimming the reduced definition set.
+    FinalizePackage,
+}
+
+/// A progress update emitted while building a reduced TrID package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TridBuildProgress {
+    /// The current transformation stage.
+    pub stage: TridBuildStage,
+    /// Human-readable description of the active work.
+    pub message: String,
+    /// Completed units within the current stage.
+    pub current: usize,
+    /// Total units expected for the current stage when known.
+    pub total: Option<usize>,
+}
 
 /// Diagnostics produced while transforming TrID XML definitions into an `rpkg`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -72,6 +101,25 @@ pub fn build_trid_xml_package(source: impl AsRef<Path>) -> Result<DefinitionPack
     Ok(build_trid_xml_package_with_report(source)?.package)
 }
 
+/// Build a reduced `filedefs.rpkg` package from a TrID XML source while reporting progress.
+///
+/// # Returns
+///
+/// - `Result<TridBuildOutput, BuilderError>` - The reduced package and transformation report.
+///
+/// # Errors
+///
+/// Returns an error when the source cannot be transformed successfully.
+pub fn build_trid_xml_package_with_progress<F>(
+    source: impl AsRef<Path>,
+    mut progress: F,
+) -> Result<TridBuildOutput, BuilderError>
+where
+    F: FnMut(TridBuildProgress),
+{
+    build_trid_xml_package_with_report_internal(source.as_ref(), &mut progress)
+}
+
 /// Build a reduced `filedefs.rpkg` package from a TrID XML source and return diagnostics.
 ///
 /// # Returns
@@ -84,31 +132,69 @@ pub fn build_trid_xml_package(source: impl AsRef<Path>) -> Result<DefinitionPack
 pub fn build_trid_xml_package_with_report(
     source: impl AsRef<Path>,
 ) -> Result<TridBuildOutput, BuilderError> {
-    let parsed = source::load_trid_definitions(source.as_ref())?;
+    build_trid_xml_package_with_report_internal(source.as_ref(), &mut |_| {})
+}
+
+fn build_trid_xml_package_with_report_internal(
+    source: &Path,
+    progress: &mut dyn FnMut(TridBuildProgress),
+) -> Result<TridBuildOutput, BuilderError> {
+    info!(source = %source.display(), "building reduced TrID XML package");
+    progress(TridBuildProgress {
+        stage: TridBuildStage::LoadSource,
+        message: format!("Loading source {}", source.display()),
+        current: 0,
+        total: None,
+    });
+    let parsed = source::load_trid_definitions(source, progress)?;
     let mut report = TridTransformReport {
         total_parsed: parsed.len(),
         ..TridTransformReport::default()
     };
+    progress(TridBuildProgress {
+        stage: TridBuildStage::ReduceDefinitions,
+        message: "Reducing validated definitions".to_string(),
+        current: 0,
+        total: Some(report.total_parsed),
+    });
 
     let mut mime_cache = HashMap::new();
     let mut survivors = Vec::new();
     let catalog = mime_catalog();
     let seeds = extension_seeds();
 
-    for definition in parsed {
+    for (index, definition) in parsed.into_iter().enumerate() {
         if definition.signature.patterns.is_empty() {
             report.signature_rejected += 1;
+            progress(TridBuildProgress {
+                stage: TridBuildStage::ReduceDefinitions,
+                message: "Reducing validated definitions".to_string(),
+                current: index + 1,
+                total: Some(report.total_parsed),
+            });
             continue;
         }
 
         let Some(level) = seeds.best_level(&definition.extensions) else {
             report.extension_rejected += 1;
+            progress(TridBuildProgress {
+                stage: TridBuildStage::ReduceDefinitions,
+                message: "Reducing validated definitions".to_string(),
+                current: index + 1,
+                total: Some(report.total_parsed),
+            });
             continue;
         };
 
         let raw_mime = definition.mime_type.clone();
         let Some(mime) = catalog.canonicalize(&raw_mime, &mut mime_cache) else {
             report.mime_rejected += 1;
+            progress(TridBuildProgress {
+                stage: TridBuildStage::ReduceDefinitions,
+                message: "Reducing validated definitions".to_string(),
+                current: index + 1,
+                total: Some(report.total_parsed),
+            });
             continue;
         };
 
@@ -117,7 +203,23 @@ pub fn build_trid_xml_package_with_report(
         }
 
         survivors.push(SluiceCandidate::from_definition(definition, level, &mime));
+        progress(TridBuildProgress {
+            stage: TridBuildStage::ReduceDefinitions,
+            message: "Reducing validated definitions".to_string(),
+            current: index + 1,
+            total: Some(report.total_parsed),
+        });
     }
+
+    debug!(
+        total_parsed = report.total_parsed,
+        mime_corrected = report.mime_corrected,
+        mime_rejected = report.mime_rejected,
+        extension_rejected = report.extension_rejected,
+        signature_rejected = report.signature_rejected,
+        survivors = survivors.len(),
+        "completed TrID validation and reduction pass"
+    );
 
     survivors.sort_by(|left, right| {
         right
@@ -135,6 +237,17 @@ pub fn build_trid_xml_package_with_report(
         survivors.truncate(TARGET_DEFINITION_COUNT);
     }
     report.final_kept = survivors.len();
+    progress(TridBuildProgress {
+        stage: TridBuildStage::FinalizePackage,
+        message: "Finalizing reduced package".to_string(),
+        current: report.final_kept,
+        total: Some(report.final_kept),
+    });
+    info!(
+        final_kept = report.final_kept,
+        final_trimmed = report.final_trimmed,
+        "reduced TrID definitions package ready"
+    );
 
     let package = DefinitionPackage {
         package_version: PACKAGE_VERSION.to_string(),

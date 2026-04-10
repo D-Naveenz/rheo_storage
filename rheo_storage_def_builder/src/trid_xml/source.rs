@@ -4,16 +4,21 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tempfile::{TempDir, tempdir};
+use tracing::{debug, info};
 
 use crate::BuilderError;
 
-use super::{ParsedTridDefinition, model::parse_trid_xml_definition};
+use super::{
+    ParsedTridDefinition, TridBuildProgress, TridBuildStage, model::parse_trid_xml_definition,
+};
 
 pub(crate) fn load_trid_definitions(
     source: &Path,
+    progress: &mut dyn FnMut(TridBuildProgress),
 ) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+    info!(source = %source.display(), "loading TrID XML source");
     if source.is_dir() {
-        return load_from_directory(source);
+        return load_from_directory(source, progress);
     }
 
     if is_xml_file(source) {
@@ -21,7 +26,7 @@ pub(crate) fn load_trid_definitions(
     }
 
     if is_7z_file(source) {
-        return load_from_archive(source);
+        return load_from_archive(source, progress);
     }
 
     Err(BuilderError::UnsupportedSource {
@@ -30,6 +35,7 @@ pub(crate) fn load_trid_definitions(
 }
 
 fn load_single_xml_file(source: &Path) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+    debug!(source = %source.display(), "reading single TrID XML file");
     let xml = fs::read_to_string(source).map_err(|error| BuilderError::Io {
         operation: "read TrID XML source",
         path: source.to_path_buf(),
@@ -39,26 +45,57 @@ fn load_single_xml_file(source: &Path) -> Result<Vec<ParsedTridDefinition>, Buil
     Ok(vec![definition])
 }
 
-fn load_from_directory(source: &Path) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+fn load_from_directory(
+    source: &Path,
+    progress: &mut dyn FnMut(TridBuildProgress),
+) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+    debug!(source = %source.display(), "enumerating TrID XML directory");
     let mut xml_files = Vec::new();
     collect_xml_files(source, &mut xml_files)?;
     xml_files.sort();
+    progress(TridBuildProgress {
+        stage: TridBuildStage::ParseDefinitions,
+        message: "Parsing XML definitions".to_string(),
+        current: 0,
+        total: Some(xml_files.len()),
+    });
 
-    let mut definitions = Vec::with_capacity(xml_files.len());
-    for xml_file in xml_files {
+    let total_files = xml_files.len();
+    let mut definitions = Vec::with_capacity(total_files);
+    for (index, xml_file) in xml_files.into_iter().enumerate() {
         let xml = fs::read_to_string(&xml_file).map_err(|error| BuilderError::Io {
             operation: "read TrID XML source",
             path: xml_file.clone(),
             source: error,
         })?;
         definitions.push(parse_trid_xml_definition(&xml, &xml_file)?);
+        progress(TridBuildProgress {
+            stage: TridBuildStage::ParseDefinitions,
+            message: "Parsing XML definitions".to_string(),
+            current: index + 1,
+            total: Some(total_files),
+        });
     }
+    info!(
+        count = definitions.len(),
+        "loaded TrID XML definitions from directory"
+    );
     Ok(definitions)
 }
 
-fn load_from_archive(source: &Path) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+fn load_from_archive(
+    source: &Path,
+    progress: &mut dyn FnMut(TridBuildProgress),
+) -> Result<Vec<ParsedTridDefinition>, BuilderError> {
+    info!(source = %source.display(), "extracting TrID XML archive");
+    progress(TridBuildProgress {
+        stage: TridBuildStage::ExtractArchive,
+        message: format!("Extracting {}", source.display()),
+        current: 0,
+        total: None,
+    });
     let extraction_dir = extract_archive(source)?;
-    load_from_directory(extraction_dir.path())
+    load_from_directory(extraction_dir.path(), progress)
 }
 
 fn extract_archive(source: &Path) -> Result<TempDir, BuilderError> {
@@ -95,6 +132,7 @@ fn extract_archive(source: &Path) -> Result<TempDir, BuilderError> {
         });
     }
 
+    debug!(path = %source.display(), destination = %temp.path().display(), "archive extracted successfully");
     Ok(temp)
 }
 

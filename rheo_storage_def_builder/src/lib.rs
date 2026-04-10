@@ -6,11 +6,12 @@ use rheo_storage_lib::{
     encode_definition_package,
 };
 use thiserror::Error;
-
+use tracing::{debug, info};
 mod trid_xml;
 
 pub use trid_xml::{
-    TridBuildOutput, TridTransformReport, build_trid_xml_package,
+    TridBuildOutput, TridBuildProgress, TridBuildStage, TridTransformReport,
+    build_trid_xml_package, build_trid_xml_package_with_progress,
     build_trid_xml_package_with_report, inspect_trid_xml_source,
 };
 
@@ -101,6 +102,7 @@ impl PackageSummary {
 /// ```
 pub fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, BuilderError> {
     let path = path.as_ref();
+    info!(path = %path.display(), "loading definitions package");
     let bytes = fs::read(path).map_err(|source| BuilderError::Io {
         operation: "read package",
         path: path.to_path_buf(),
@@ -130,6 +132,7 @@ pub fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, Builder
 /// assert!(!package.definitions.is_empty());
 /// ```
 pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
+    info!("loading bundled runtime definitions package");
     bundled_definition_package()
         .cloned()
         .map_err(|err| BuilderError::Package {
@@ -161,6 +164,7 @@ pub fn write_package(
     path: impl AsRef<Path>,
 ) -> Result<PathBuf, BuilderError> {
     let path = path.as_ref().to_path_buf();
+    info!(path = %path.display(), "writing definitions package");
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| BuilderError::Io {
             operation: "create output directory for",
@@ -172,6 +176,11 @@ pub fn write_package(
     let bytes = encode_definition_package(package).map_err(|err| BuilderError::Package {
         message: err.to_string(),
     })?;
+    debug!(
+        bytes = bytes.len(),
+        definitions = package.definitions.len(),
+        "encoded definitions package"
+    );
     fs::write(&path, bytes).map_err(|source| BuilderError::Io {
         operation: "write package",
         path: path.clone(),
@@ -202,6 +211,7 @@ pub fn normalize_package(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
 ) -> Result<PathBuf, BuilderError> {
+    info!("normalizing definitions package");
     let package = load_package(input)?;
     write_package(&package, output)
 }
@@ -227,6 +237,7 @@ pub fn packages_match(
     left: impl AsRef<Path>,
     right: impl AsRef<Path>,
 ) -> Result<bool, BuilderError> {
+    info!("comparing definitions packages");
     let left = load_package(left)?;
     let right = load_package(right)?;
     Ok(left == right)
@@ -250,6 +261,7 @@ pub fn packages_match(
 /// let _ = inspect_package("Output/filedefs.rpkg");
 /// ```
 pub fn inspect_package(path: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
+    info!("inspecting definitions package");
     let package = load_package(path)?;
     Ok(PackageSummary::from_package(&package))
 }
