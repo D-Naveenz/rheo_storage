@@ -7,6 +7,10 @@ use rheo_storage_lib::{
 };
 use thiserror::Error;
 
+mod trid_xml;
+
+pub use trid_xml::{build_trid_xml_package, inspect_trid_xml_source};
+
 /// Errors produced by the definitions builder crate.
 #[derive(Debug, Error)]
 pub enum BuilderError {
@@ -22,6 +26,30 @@ pub enum BuilderError {
     /// A package payload could not be decoded or encoded.
     #[error("package error: {message}")]
     Package { message: String },
+
+    /// A TrID XML payload could not be parsed.
+    #[error("failed to parse TrID XML '{path}': {message}")]
+    Xml { path: PathBuf, message: String },
+
+    /// A TrID XML definition contained an invalid hex byte sequence.
+    #[error("invalid hex sequence '{value}' in '{path}'")]
+    InvalidHex { path: PathBuf, value: String },
+
+    /// A source path did not match a supported builder input kind.
+    #[error("unsupported TrID source '{path}': expected a .7z archive, .xml file, or directory")]
+    UnsupportedSource { path: PathBuf },
+
+    /// A required archive tool was not available on the host.
+    #[error("archive tool '{tool}' is not available on PATH")]
+    ArchiveToolUnavailable { tool: &'static str },
+
+    /// Extracting an archive failed.
+    #[error("failed to {operation} archive '{path}': {message}")]
+    ArchiveCommand {
+        operation: &'static str,
+        path: PathBuf,
+        message: String,
+    },
 }
 
 /// Summary information about a definitions package.
@@ -37,6 +65,10 @@ pub struct PackageSummary {
 
 impl PackageSummary {
     /// Build a summary from a decoded package.
+    ///
+    /// # Returns
+    ///
+    /// - `PackageSummary` - A compact view of the package metadata.
     pub fn from_package(package: &DefinitionPackage) -> Self {
         Self {
             package_version: package.package_version.clone(),
@@ -56,6 +88,14 @@ impl PackageSummary {
 ///
 /// Returns [`BuilderError::Io`] if the file cannot be read or
 /// [`BuilderError::Package`] if the payload is not a valid package.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rheo_storage_def_builder::load_package;
+///
+/// let _ = load_package("Output/filedefs.rpkg");
+/// ```
 pub fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, BuilderError> {
     let path = path.as_ref();
     let bytes = fs::read(path).map_err(|source| BuilderError::Io {
@@ -77,6 +117,15 @@ pub fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, Builder
 /// # Errors
 ///
 /// Returns [`BuilderError::Package`] if the bundled package cannot be decoded.
+///
+/// # Examples
+///
+/// ```
+/// use rheo_storage_def_builder::load_bundled_package;
+///
+/// let package = load_bundled_package().unwrap();
+/// assert!(!package.definitions.is_empty());
+/// ```
 pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
     bundled_definition_package()
         .cloned()
@@ -95,6 +144,15 @@ pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
 ///
 /// Returns [`BuilderError::Io`] when the output path cannot be created or written,
 /// or [`BuilderError::Package`] when serialization fails.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rheo_storage_def_builder::{load_bundled_package, write_package};
+///
+/// let package = load_bundled_package().unwrap();
+/// let _ = write_package(&package, "Output/filedefs.rpkg");
+/// ```
 pub fn write_package(
     package: &DefinitionPackage,
     path: impl AsRef<Path>,
@@ -129,6 +187,14 @@ pub fn write_package(
 ///
 /// Returns an error if either the input package cannot be decoded or the output
 /// cannot be written.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rheo_storage_def_builder::normalize_package;
+///
+/// let _ = normalize_package("Input/filedefs.rpkg", "Output/filedefs.rpkg");
+/// ```
 pub fn normalize_package(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
@@ -146,6 +212,14 @@ pub fn normalize_package(
 /// # Errors
 ///
 /// Returns an error if either package cannot be read or decoded.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rheo_storage_def_builder::packages_match;
+///
+/// let _ = packages_match("left.rpkg", "right.rpkg");
+/// ```
 pub fn packages_match(
     left: impl AsRef<Path>,
     right: impl AsRef<Path>,
@@ -164,6 +238,14 @@ pub fn packages_match(
 /// # Errors
 ///
 /// Returns an error if the package cannot be loaded.
+///
+/// # Examples
+///
+/// ```no_run
+/// use rheo_storage_def_builder::inspect_package;
+///
+/// let _ = inspect_package("Output/filedefs.rpkg");
+/// ```
 pub fn inspect_package(path: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
     let package = load_package(path)?;
     Ok(PackageSummary::from_package(&package))

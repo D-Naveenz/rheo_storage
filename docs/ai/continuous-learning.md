@@ -12,3 +12,5 @@
 - A single synchronous operations core plus optional async wrappers is easier to reason about than separate sync and async mutation implementations.
 - Directory watching belongs behind a debounced event boundary so callers get stable change notifications without inheriting raw watcher noise.
 - Shared package types between the runtime and builder are safer than re-describing the MessagePack contract in multiple crates.
+- TrID XML is structurally simple enough to parse directly, but the builder should tolerate messy source data such as repeated optional nodes instead of assuming every file is perfectly normalized.
+- On Windows, the system `tar` tool can handle `.7z` archives well enough for builder ingestion, which avoids forcing contributors to manually unpack tens of thousands of TrID XML files into the repo.

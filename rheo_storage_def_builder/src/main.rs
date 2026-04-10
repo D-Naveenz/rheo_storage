@@ -2,12 +2,13 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use rheo_storage_def_builder::{
-    inspect_package, load_bundled_package, normalize_package, packages_match, write_package,
+    build_trid_xml_package, inspect_package, inspect_trid_xml_source, load_bundled_package,
+    normalize_package, packages_match, write_package,
 };
 
 #[derive(Debug, Parser)]
 #[command(name = "rheo_storage_def_builder")]
-#[command(about = "Inspect, normalize, and emit Rheo definitions packages.")]
+#[command(about = "Inspect, build, normalize, and emit Rheo definitions packages.")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -20,8 +21,8 @@ enum Command {
         #[arg(short, long, default_value = "Output/filedefs.rpkg")]
         output: PathBuf,
     },
-    /// Normalize an existing package by decoding and re-encoding it.
-    Normalize {
+    /// Build a package from TrID XML definitions in a file, directory, or .7z archive.
+    BuildTridXml {
         #[arg(short, long)]
         input: PathBuf,
         #[arg(short, long, default_value = "Output/filedefs.rpkg")]
@@ -31,6 +32,18 @@ enum Command {
     Inspect {
         #[arg(short, long)]
         input: PathBuf,
+    },
+    /// Print summary information about a TrID XML source.
+    InspectTridXml {
+        #[arg(short, long)]
+        input: PathBuf,
+    },
+    /// Normalize an existing package by decoding and re-encoding it.
+    Normalize {
+        #[arg(short, long)]
+        input: PathBuf,
+        #[arg(short, long, default_value = "Output/filedefs.rpkg")]
+        output: PathBuf,
     },
     /// Compare two package files for semantic equality.
     Verify {
@@ -50,15 +63,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let path = write_package(&package, output)?;
             println!("wrote package: {}", path.display());
         }
-        Command::Normalize { input, output } => {
-            let path = normalize_package(input, output)?;
-            println!("normalized package: {}", path.display());
+        Command::BuildTridXml { input, output } => {
+            let package = build_trid_xml_package(&input)?;
+            let path = write_package(&package, output)?;
+            println!("built package from TrID XML: {}", path.display());
         }
         Command::Inspect { input } => {
             let summary = inspect_package(input)?;
             println!("package_version={}", summary.package_version);
             println!("tags={}", summary.tags);
             println!("definition_count={}", summary.definition_count);
+        }
+        Command::InspectTridXml { input } => {
+            let summary = inspect_trid_xml_source(input)?;
+            println!("package_version={}", summary.package_version);
+            println!("tags={}", summary.tags);
+            println!("definition_count={}", summary.definition_count);
+        }
+        Command::Normalize { input, output } => {
+            let path = normalize_package(input, output)?;
+            println!("normalized package: {}", path.display());
         }
         Command::Verify { left, right } => {
             let matches = packages_match(left, right)?;

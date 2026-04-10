@@ -23,9 +23,14 @@
   - recursive directory copy, move, and delete
   - directory navigation and debounced watching
 - Exclude:
-  - transactional definitions building
   - .NET interop and exported DLL design
   - operation-triggered metadata or analysis loading unless the caller requests it
+
+## Builder Scope
+- `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
+- Support `.xml` files, extracted definition directories, and `.7z` archives without requiring users to manually unpack large definition sets into the repo.
+- Preserve the current `filedefs.rpkg` runtime contract until the runtime itself needs a format change.
+- Keep builder output deterministic even when source archives contain inconsistent XML such as repeated optional nodes.
 
 ## ABI Layer Rules
 - Keep COM and WinRT crates thin over the core runtime.
