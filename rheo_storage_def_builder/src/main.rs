@@ -1,8 +1,11 @@
 mod logging;
 
+use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 
 use clap::{ArgAction, CommandFactory, Parser, Subcommand};
+use crossterm::event::{Event, read};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rheo_storage_def_builder::{
     TridBuildProgress, TridBuildStage, TridTransformReport, build_trid_xml_package_with_progress,
@@ -186,10 +189,13 @@ fn main() {
     });
 
     let output = Output::new(cli.silent);
-    if let Err(error) = run(cli.command, output) {
+    let result = run(cli.command, output);
+    if let Err(error) = result {
         error!(error = %error, "builder command failed");
+        pause_before_exit(cli.silent);
         std::process::exit(1);
     }
+    pause_before_exit(cli.silent);
 }
 
 fn run(command: Option<Command>, output: Output) -> Result<(), Box<dyn std::error::Error>> {
@@ -283,4 +289,29 @@ fn print_transform_report(output: Output, report: &TridTransformReport) {
     output.field("Signature Rejected", report.signature_rejected);
     output.field("Final Trimmed", report.final_trimmed);
     output.field("Final Kept", report.final_kept);
+}
+
+fn pause_before_exit(silent: bool) {
+    if silent || !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return;
+    }
+
+    let _ = write!(io::stdout(), "\nPress any key to continue . . .");
+    let _ = io::stdout().flush();
+
+    if enable_raw_mode().is_ok() {
+        let _ = wait_for_keypress();
+        let _ = disable_raw_mode();
+    }
+
+    let _ = writeln!(io::stdout());
+}
+
+fn wait_for_keypress() -> io::Result<()> {
+    loop {
+        match read()? {
+            Event::Key(_) => return Ok(()),
+            _ => continue,
+        }
+    }
 }

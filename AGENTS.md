@@ -24,7 +24,7 @@
 - The operations layer should keep the simple path fast: do not force info or analysis loading for plain copy, move, read, write, or delete calls.
 - `rheo_storage_def_builder` owns package inspection, normalization, vendored MIME validation, floodgate reduction, and TrID XML source ingestion from `.xml`, extracted directories, and `.7z` archives.
 - `filedefs.rpkg` now supports dual-read package loading: legacy plain MessagePack and the newer Rheo LZ4-wrapped format.
-- `rheo_storage_com` and `rheo_storage_winrt` are wrapper layers over the Rust core and must stay thin.
+- `rheo_storage_winrt` is the only active ABI wrapper layer over the Rust core and must stay thin.
 
 ## Working Rhythm
 - Update `docs/ai/continuous-learning.md` whenever a repeated implementation lesson appears.
