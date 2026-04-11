@@ -1,8 +1,23 @@
 [workspace]
 members = [
-    "rheo_storage_lib",
+    "rheo_storage",
     "rheo_storage_def_builder",
-    "rheo_storage_com",
     "rheo_storage_winrt",
 ]
 resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Naveen Dharmathunga <dasheenaveen@outlook.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/D-Naveenz/rheo_storage"
+homepage = "https://github.com/D-Naveenz/rheo_storage"
+
+# Read the optimization guideline for more details: https://ratatui.rs/recipes/apps/release-your-app/#optimizations
+[profile.release]
+codegen-units = 1   # Allows compiler to perform better optimization.
+lto = true          # Enables Link-time Optimization.
+opt-level = "s"     # Prioritizes small binary size. Use `3` if you prefer speed.
+strip = true        # Ensures debug symbols are removed.
