@@ -338,11 +338,11 @@ pub(crate) fn open_source_file(path: &Path) -> Result<File, StorageError> {
         const FILE_SHARE_WRITE: u32 = 0x0000_0002;
         const FILE_SHARE_DELETE: u32 = 0x0000_0004;
 
-        return OpenOptions::new()
+        OpenOptions::new()
             .read(true)
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
             .open(path)
-            .map_err(|err| StorageError::io("open file for reading", path, err));
+            .map_err(|err| StorageError::io("open file for reading", path, err))
     }
 
     #[cfg(not(windows))]

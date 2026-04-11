@@ -33,9 +33,7 @@ pub(crate) fn init_logging(options: LoggingOptions) -> Result<LoggingRuntime, st
 
     let (writer, guard) = tracing_appender::non_blocking(file);
 
-    let console_max_level = if options.interactive {
-        LevelFilter::ERROR
-    } else if options.silent {
+    let console_max_level = if options.interactive || options.silent {
         LevelFilter::ERROR
     } else {
         match options.verbose {

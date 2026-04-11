@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use quick_xml::de::from_str;
 use serde::Deserialize;
@@ -172,14 +172,14 @@ fn build_remarks(remarks: &[String], refine: &str, reference_url: &str) -> Strin
     parts.join("\n")
 }
 
-fn decode_hex_bytes(path: &PathBuf, value: &str) -> Result<Vec<u8>, BuilderError> {
+fn decode_hex_bytes(path: &Path, value: &str) -> Result<Vec<u8>, BuilderError> {
     let normalized = value
         .chars()
         .filter(|ch| !ch.is_ascii_whitespace())
         .collect::<String>();
     if normalized.len() % 2 != 0 {
         return Err(BuilderError::InvalidHex {
-            path: path.clone(),
+            path: path.to_path_buf(),
             value: value.to_string(),
         });
     }
@@ -188,11 +188,11 @@ fn decode_hex_bytes(path: &PathBuf, value: &str) -> Result<Vec<u8>, BuilderError
     let chars = normalized.as_bytes();
     for pair in chars.chunks_exact(2) {
         let chunk = std::str::from_utf8(pair).map_err(|_| BuilderError::InvalidHex {
-            path: path.clone(),
+            path: path.to_path_buf(),
             value: value.to_string(),
         })?;
         let byte = u8::from_str_radix(chunk, 16).map_err(|_| BuilderError::InvalidHex {
-            path: path.clone(),
+            path: path.to_path_buf(),
             value: value.to_string(),
         })?;
         bytes.push(byte);

@@ -71,7 +71,7 @@ where
             })
         }
         BuilderAction::BuildTridXml { input, output } => {
-            let build = build_trid_xml_package_with_progress(&input, |update| progress(update))?;
+            let build = build_trid_xml_package_with_progress(&input, &mut progress)?;
             let written = write_package(&build.package, &output)?;
             let mut fields = vec![
                 field("Input", input.display().to_string()),
@@ -101,7 +101,7 @@ where
             })
         }
         BuilderAction::InspectTridXml { input } => {
-            let build = build_trid_xml_package_with_progress(&input, |update| progress(update))?;
+            let build = build_trid_xml_package_with_progress(&input, &mut progress)?;
             let mut fields = vec![field("Log", log_path.display().to_string())];
             extend_transform_report_fields(&mut fields, &build.report);
             Ok(CommandReport {

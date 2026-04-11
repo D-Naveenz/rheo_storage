@@ -150,12 +150,7 @@ fn debounce_worker(
     event_tx: mpsc::Sender<StorageChangeEvent>,
     debounce_window: Duration,
 ) {
-    loop {
-        let first = match raw_rx.recv() {
-            Ok(first) => first,
-            Err(_) => break,
-        };
-
+    while let Ok(first) = raw_rx.recv() {
         let mut batch = Vec::new();
         if let Ok(first) = first {
             batch.push(first);
