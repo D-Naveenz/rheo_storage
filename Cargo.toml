@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "rheo_rpkg",
     "rheo_storage",
     "rheo_storage_def_builder",
     "rheo_storage_winrt",

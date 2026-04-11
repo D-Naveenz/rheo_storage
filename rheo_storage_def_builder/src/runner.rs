@@ -100,8 +100,8 @@ where
                 fields: vec![
                     field("Package Id", summary.package_id),
                     field("Purpose", format!("{:?}", summary.purpose)),
-                    field("Serialization", format!("{:?}", summary.serialization)),
                     field("Compression", format!("{:?}", summary.compression)),
+                    field("Integrity", format!("{:?}", summary.integrity)),
                     field("Package Version", summary.package_version),
                     field("Source Version", summary.source_version),
                     field("Package Revision", summary.package_revision.to_string()),

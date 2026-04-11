@@ -8,6 +8,7 @@ It supports:
 - building reduced `filedefs.rpkg` packages from TrID XML inputs
 - reading `.xml`, extracted directories, and `.7z` archives
 - normalizing and verifying existing package files
+- refreshing the embedded runtime package with `sync-embedded`
 - interactive terminal use through the Rheo shell
 - script-friendly one-shot CLI commands
 
