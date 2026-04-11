@@ -1,19 +1,22 @@
 use std::collections::BTreeSet;
-use std::io::{Cursor, Read, Write};
 
-use lz4_flex::frame::{FrameDecoder, FrameEncoder};
 use once_cell::sync::Lazy;
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::error::StorageError;
+use crate::rpkg::{
+    CompressionKind, PackageMetadata, PackagePurpose, RpkgDecodeError, RpkgEncodeError,
+    RpkgEncodeOptions, SerializationKind, VerificationMode, decode as decode_rpkg,
+    encode as encode_rpkg,
+};
 
 const BUNDLED_FILEDEFS_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/resources/filedefs.rpkg"
 ));
-const RPKG_LZ4_MAGIC: &[u8; 8] = b"RPKGLZ4\x01";
+pub const DEFINITION_PACKAGE_ID: [u8; 4] = *b"FDEF";
 const CATCH_ALL_INDEX: usize = 256;
 
 static PACKAGE: Lazy<Result<DefinitionPackage, String>> = Lazy::new(|| {
@@ -28,13 +31,17 @@ static DATABASE: Lazy<Result<DefinitionDatabase, String>> = Lazy::new(|| {
 /// Errors that can occur while decoding an `rpkg` definitions package.
 #[derive(Debug, Error)]
 pub enum DefinitionPackageDecodeError {
+    /// The container was not a valid RPKG v2 definitions package.
+    #[error("failed to decode RPKG container: {0}")]
+    Rpkg(#[from] RpkgDecodeError),
+
     /// The MessagePack payload was malformed.
     #[error("failed to decode MessagePack payload: {0}")]
     MessagePack(#[from] rmp_serde::decode::Error),
 
-    /// The LZ4 payload could not be decompressed.
-    #[error("failed to decompress LZ4 payload: {0}")]
-    Compression(#[from] std::io::Error),
+    /// The container held an unexpected package identifier.
+    #[error("unexpected package identifier '{found}'")]
+    InvalidPackageId { found: String },
 }
 
 /// Errors that can occur while encoding an `rpkg` definitions package.
@@ -44,13 +51,9 @@ pub enum DefinitionPackageEncodeError {
     #[error("failed to encode MessagePack payload: {0}")]
     MessagePack(#[from] rmp_serde::encode::Error),
 
-    /// The MessagePack payload could not be compressed.
-    #[error("failed to compress LZ4 payload: {0}")]
-    Compression(#[from] std::io::Error),
-
-    /// The LZ4 frame could not be finalized.
-    #[error("failed to finalize LZ4 payload: {0}")]
-    CompressionFrame(#[from] lz4_flex::frame::Error),
+    /// The package could not be encoded into an `RPKG` container.
+    #[error("failed to encode RPKG container: {0}")]
+    Rpkg(#[from] RpkgEncodeError),
 }
 
 /// The serialized definitions package used by the runtime and builder.
@@ -58,6 +61,10 @@ pub enum DefinitionPackageEncodeError {
 pub struct DefinitionPackage {
     /// The package format version label.
     pub package_version: String,
+    /// Upstream source version inherited from TrID XML.
+    pub source_version: String,
+    /// Rheo-specific package revision for the current container scheme.
+    pub package_revision: u16,
     /// Reserved tags field carried forward from the legacy package.
     pub tags: u32,
     /// File signature definitions contained in the package.
@@ -121,54 +128,44 @@ pub struct DefinitionDatabase {
 }
 
 impl DefinitionPackage {
-    /// Decode a raw legacy MessagePack definitions package.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<DefinitionPackage, rmp_serde::decode::Error>` - The decoded package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the payload is not valid Rheo MessagePack package data.
+    /// Decode the raw MessagePack payload used inside an `RPKG` definitions container.
     pub fn from_messagepack_bytes(bytes: &[u8]) -> Result<Self, rmp_serde::decode::Error> {
         let RawPackage(package_version, _, tags, definitions): RawPackage =
             rmp_serde::from_slice(bytes)?;
         Ok(Self {
             package_version,
+            source_version: String::new(),
+            package_revision: 0,
             tags,
             definitions,
         })
     }
 
-    /// Decode a definitions package from either plain MessagePack or Rheo LZ4-wrapped bytes.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<DefinitionPackage, DefinitionPackageDecodeError>` - The decoded package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the payload cannot be decompressed or deserialized.
+    /// Decode a definitions package from an `RPKG` v2 container.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DefinitionPackageDecodeError> {
-        if is_compressed_definition_package(bytes) {
-            let mut decoder = FrameDecoder::new(Cursor::new(&bytes[RPKG_LZ4_MAGIC.len()..]));
-            let mut messagepack = Vec::new();
-            decoder.read_to_end(&mut messagepack)?;
-            return Self::from_messagepack_bytes(&messagepack).map_err(Into::into);
-        }
-
-        Self::from_messagepack_bytes(bytes).map_err(Into::into)
+        Self::from_bytes_with_verification(bytes, VerificationMode::Default)
     }
 
-    /// Encode this package into the raw legacy MessagePack payload.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Vec<u8>, rmp_serde::encode::Error>` - The uncompressed MessagePack bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if MessagePack serialization fails.
+    /// Decode a definitions package from an `RPKG` v2 container with explicit verification behavior.
+    pub fn from_bytes_with_verification(
+        bytes: &[u8],
+        verification_mode: VerificationMode,
+    ) -> Result<Self, DefinitionPackageDecodeError> {
+        let decoded = decode_rpkg(bytes, verification_mode)?;
+        if decoded.package_id != DEFINITION_PACKAGE_ID {
+            return Err(DefinitionPackageDecodeError::InvalidPackageId {
+                found: decoded.package_id_string(),
+            });
+        }
+
+        let mut package = Self::from_messagepack_bytes(&decoded.payload)?;
+        package.package_version = decoded.metadata.package_version;
+        package.source_version = decoded.metadata.source_version;
+        package.package_revision = decoded.metadata.package_revision;
+        Ok(package)
+    }
+
+    /// Encode this package into the raw MessagePack payload stored inside an `RPKG` container.
     pub fn to_messagepack_bytes(&self) -> Result<Vec<u8>, rmp_serde::encode::Error> {
         rmp_serde::to_vec(&RawPackageOut(
             self.package_version.clone(),
@@ -178,25 +175,30 @@ impl DefinitionPackage {
         ))
     }
 
-    /// Encode this package into the default `rpkg` format: MessagePack wrapped in LZ4.
-    ///
-    /// # Returns
-    ///
-    /// - `Result<Vec<u8>, DefinitionPackageEncodeError>` - The encoded package bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization or compression fails.
+    /// Encode this package into the default external `RPKG` v2 container.
     pub fn to_bytes(&self) -> Result<Vec<u8>, DefinitionPackageEncodeError> {
-        let messagepack = self.to_messagepack_bytes()?;
-        let mut encoder = FrameEncoder::new(Vec::new());
-        encoder.write_all(&messagepack)?;
-        let compressed = encoder.finish()?;
+        self.to_bytes_with_purpose(PackagePurpose::External)
+    }
 
-        let mut bytes = Vec::with_capacity(RPKG_LZ4_MAGIC.len() + compressed.len());
-        bytes.extend_from_slice(RPKG_LZ4_MAGIC);
-        bytes.extend_from_slice(&compressed);
-        Ok(bytes)
+    /// Encode this package into an `RPKG` v2 container with the requested package purpose.
+    pub fn to_bytes_with_purpose(
+        &self,
+        purpose: PackagePurpose,
+    ) -> Result<Vec<u8>, DefinitionPackageEncodeError> {
+        let payload = self.to_messagepack_bytes()?;
+        let metadata = PackageMetadata::new(
+            self.package_version.clone(),
+            self.source_version.clone(),
+            self.package_revision,
+        );
+        let options = RpkgEncodeOptions {
+            package_id: DEFINITION_PACKAGE_ID,
+            serialization: SerializationKind::MessagePack,
+            compression: CompressionKind::Lz4Frame,
+            purpose,
+            metadata,
+        };
+        Ok(encode_rpkg(&payload, &options)?)
     }
 }
 
@@ -254,25 +256,7 @@ impl DefinitionDatabase {
     }
 }
 
-/// Check whether bytes start with the Rheo compressed `rpkg` header.
-///
-/// # Returns
-///
-/// - `bool` - `true` when the payload uses the compressed package header.
-pub fn is_compressed_definition_package(bytes: &[u8]) -> bool {
-    bytes.starts_with(RPKG_LZ4_MAGIC)
-}
-
 /// Load the embedded definitions package bundled with `rheo_storage`.
-///
-/// # Returns
-///
-/// - `Result<&'static DefinitionPackage, StorageError>` - The decoded embedded package.
-///
-/// # Errors
-///
-/// Returns [`StorageError::DefinitionsLoad`] when the embedded payload
-/// cannot be decoded.
 pub fn bundled_definition_package() -> Result<&'static DefinitionPackage, StorageError> {
     PACKAGE
         .as_ref()
@@ -281,33 +265,35 @@ pub fn bundled_definition_package() -> Result<&'static DefinitionPackage, Storag
         })
 }
 
-/// Decode a definitions package from bytes.
-///
-/// # Returns
-///
-/// - `Result<DefinitionPackage, StorageError>` - The decoded package.
-///
-/// # Errors
-///
-/// Returns [`StorageError::DefinitionsLoad`] when the payload is malformed.
+/// Decode a definitions package from bytes using purpose-aware checksum verification.
 pub fn decode_definition_package(bytes: &[u8]) -> Result<DefinitionPackage, StorageError> {
-    DefinitionPackage::from_bytes(bytes).map_err(|err| StorageError::DefinitionsLoad {
-        message: err.to_string(),
+    decode_definition_package_with_verification(bytes, VerificationMode::Default)
+}
+
+/// Decode a definitions package from bytes using the requested checksum verification mode.
+pub fn decode_definition_package_with_verification(
+    bytes: &[u8],
+    verification_mode: VerificationMode,
+) -> Result<DefinitionPackage, StorageError> {
+    DefinitionPackage::from_bytes_with_verification(bytes, verification_mode).map_err(|err| {
+        StorageError::DefinitionsLoad {
+            message: err.to_string(),
+        }
     })
 }
 
-/// Encode a definitions package into the default compressed `rpkg` format.
-///
-/// # Returns
-///
-/// - `Result<Vec<u8>, StorageError>` - The encoded package bytes.
-///
-/// # Errors
-///
-/// Returns [`StorageError::DefinitionsLoad`] when serialization fails.
+/// Encode a definitions package into the default external `RPKG` v2 format.
 pub fn encode_definition_package(package: &DefinitionPackage) -> Result<Vec<u8>, StorageError> {
+    encode_definition_package_with_purpose(package, PackagePurpose::External)
+}
+
+/// Encode a definitions package into an `RPKG` v2 container with the requested package purpose.
+pub fn encode_definition_package_with_purpose(
+    package: &DefinitionPackage,
+    purpose: PackagePurpose,
+) -> Result<Vec<u8>, StorageError> {
     package
-        .to_bytes()
+        .to_bytes_with_purpose(purpose)
         .map_err(|err| StorageError::DefinitionsLoad {
             message: err.to_string(),
         })
@@ -323,21 +309,24 @@ pub(crate) fn database() -> Result<&'static DefinitionDatabase, StorageError> {
 
 #[cfg(test)]
 mod tests {
+    use crate::rpkg::{PackagePurpose, VerificationMode, RPKG_MAGIC};
+
     use super::{
         DefinitionPackage, bundled_definition_package, database, decode_definition_package,
-        encode_definition_package, is_compressed_definition_package,
+        decode_definition_package_with_verification, encode_definition_package,
+        encode_definition_package_with_purpose,
     };
 
     #[test]
-    fn legacy_rpkg_loads_successfully() {
+    fn bundled_rpkg_loads_successfully() {
         let package =
-            bundled_definition_package().expect("legacy definitions package should deserialize");
+            bundled_definition_package().expect("bundled definitions package should deserialize");
         assert!(!package.definitions.is_empty());
     }
 
     #[test]
     fn png_header_returns_png_candidate() {
-        let db = database().expect("legacy definitions package should deserialize");
+        let db = database().expect("bundled definitions package should deserialize");
         let header = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
         let candidates = db
@@ -358,7 +347,7 @@ mod tests {
     #[test]
     fn package_roundtrip_is_semantically_stable() {
         let package =
-            bundled_definition_package().expect("legacy definitions package should deserialize");
+            bundled_definition_package().expect("bundled definitions package should deserialize");
         let bytes = encode_definition_package(package).expect("package should encode");
         let decoded = decode_definition_package(&bytes).expect("encoded package should decode");
 
@@ -366,24 +355,50 @@ mod tests {
     }
 
     #[test]
-    fn compressed_package_has_magic_header() {
+    fn encoded_package_uses_rpkg_header() {
         let package =
-            bundled_definition_package().expect("legacy definitions package should deserialize");
+            bundled_definition_package().expect("bundled definitions package should deserialize");
         let bytes = package.to_bytes().expect("package should encode");
 
-        assert!(is_compressed_definition_package(&bytes));
+        assert!(bytes.starts_with(RPKG_MAGIC));
     }
 
     #[test]
-    fn plain_messagepack_package_remains_readable() {
+    fn legacy_plain_messagepack_is_rejected() {
         let package =
-            bundled_definition_package().expect("legacy definitions package should deserialize");
+            bundled_definition_package().expect("bundled definitions package should deserialize");
         let plain = package
             .to_messagepack_bytes()
             .expect("plain MessagePack should encode");
-        let decoded =
-            DefinitionPackage::from_bytes(&plain).expect("plain MessagePack should remain valid");
 
-        assert_eq!(decoded, *package);
+        let error = DefinitionPackage::from_bytes(&plain).expect_err("legacy package should fail");
+        assert!(error.to_string().contains("RPKG"));
+    }
+
+    #[test]
+    fn old_lz4_magic_is_rejected() {
+        let mut bytes = b"RPKGLZ4\x01".to_vec();
+        bytes.extend_from_slice(b"not-a-v2-package");
+
+        let error = DefinitionPackage::from_bytes(&bytes).expect_err("old format should fail");
+        assert!(error.to_string().contains("wire version") || error.to_string().contains("RPKG"));
+    }
+
+    #[test]
+    fn embedded_packages_skip_checksum_by_default_but_can_be_forced() {
+        let package =
+            bundled_definition_package().expect("bundled definitions package should deserialize");
+        let mut bytes = encode_definition_package_with_purpose(package, PackagePurpose::Embedded)
+            .expect("package should encode");
+        let checksum_byte = bytes.len() - 1;
+        bytes[checksum_byte] ^= 0x01;
+
+        let decoded =
+            decode_definition_package(&bytes).expect("embedded package should skip verification");
+        assert_eq!(decoded.package_version, package.package_version);
+
+        let error = decode_definition_package_with_verification(&bytes, VerificationMode::Always)
+            .expect_err("forced verification should fail");
+        assert!(error.to_string().contains("checksum"));
     }
 }

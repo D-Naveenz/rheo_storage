@@ -50,8 +50,8 @@ pub enum StorageError {
         source: io::Error,
     },
 
-    /// The embedded legacy definitions package could not be decoded.
-    #[error("failed to load embedded legacy file definitions: {message}")]
+    /// The embedded definitions package could not be decoded.
+    #[error("failed to load embedded file definitions: {message}")]
     DefinitionsLoad { message: String },
 
     /// An async runtime task failed before the storage operation completed.

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::builder::{
     TridBuildProgress, build_trid_xml_package_with_progress, inspect_package, load_bundled_package,
-    normalize_package, packages_match, write_package,
+    normalize_package, packages_match, sync_embedded_package, write_package,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,6 +13,11 @@ pub(crate) enum BuilderAction {
     InspectTridXml { input: PathBuf },
     Normalize { input: PathBuf, output: PathBuf },
     Verify { left: PathBuf, right: PathBuf },
+    SyncEmbedded {
+        input: PathBuf,
+        output: PathBuf,
+        check: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +49,7 @@ impl BuilderAction {
             Self::InspectTridXml { .. } => "Transformation Preview",
             Self::Normalize { .. } => "Normalized Package",
             Self::Verify { .. } => "Verification",
+            Self::SyncEmbedded { .. } => "Embedded Package Sync",
         }
     }
 }
@@ -92,7 +98,14 @@ where
                 title: "Package Summary".to_string(),
                 status: ReportStatus::Success,
                 fields: vec![
+                    field("Package Id", summary.package_id),
+                    field("Purpose", format!("{:?}", summary.purpose)),
+                    field("Serialization", format!("{:?}", summary.serialization)),
+                    field("Compression", format!("{:?}", summary.compression)),
                     field("Package Version", summary.package_version),
+                    field("Source Version", summary.source_version),
+                    field("Package Revision", summary.package_revision.to_string()),
+                    field("Checksum", if summary.checksum_verified { "verified" } else { "skipped" }),
                     field("Tags", summary.tags.to_string()),
                     field("Definitions", summary.definition_count.to_string()),
                     field("Log", log_path.display().to_string()),
@@ -140,6 +153,44 @@ where
                     field("Log", log_path.display().to_string()),
                 ],
                 exit_code: if matches { 0 } else { 1 },
+            })
+        }
+        BuilderAction::SyncEmbedded {
+            input,
+            output,
+            check,
+        } => {
+            let outcome = sync_embedded_package(&input, &output, check)?;
+            let (status, exit_code, result) = match outcome.status {
+                crate::builder::SyncEmbeddedStatus::Skipped => {
+                    (ReportStatus::Success, 0, "skipped")
+                }
+                crate::builder::SyncEmbeddedStatus::UpToDate => {
+                    (ReportStatus::Success, 0, "up-to-date")
+                }
+                crate::builder::SyncEmbeddedStatus::Updated => {
+                    (ReportStatus::Success, 0, "updated")
+                }
+                crate::builder::SyncEmbeddedStatus::NeedsUpdate => {
+                    (ReportStatus::Warning, 1, "update required")
+                }
+            };
+            let mut fields = vec![
+                field("Input", outcome.input.display().to_string()),
+                field("Output", outcome.output.display().to_string()),
+                field("Result", result),
+            ];
+            if let Some(package_version) = outcome.package_version {
+                fields.push(field("Package Version", package_version));
+            }
+            fields.push(field("Detail", outcome.detail));
+            fields.push(field("Log", log_path.display().to_string()));
+
+            Ok(CommandReport {
+                title: "Embedded Package Sync".to_string(),
+                status,
+                fields,
+                exit_code,
             })
         }
     }

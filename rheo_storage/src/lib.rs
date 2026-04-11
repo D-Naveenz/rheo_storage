@@ -1,24 +1,27 @@
 //! Rust-native storage analysis primitives for the Rheo rewrite.
 //!
 //! This crate currently focuses on the first two rewrite milestones:
-//! immutable metadata and content-based analysis backed by the legacy
+//! immutable metadata and content-based analysis backed by the bundled
 //! `filedefs.rpkg` package, plus a Rust-native file and directory operations
-//! layer with optional async wrappers. The package loader supports both
-//! legacy plain MessagePack packages and the newer LZ4-wrapped `rpkg` format.
+//! layer with optional async wrappers. The package loader now targets the
+//! single `RPKG` v2 container used by the builder.
 
 pub mod analysis;
 pub mod definitions;
 pub mod error;
 pub mod info;
 pub mod operations;
+pub mod rpkg;
 pub mod storage;
 pub mod watch;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
 pub use definitions::{
-    DefinitionPackage, DefinitionPackageDecodeError, DefinitionPackageEncodeError,
-    DefinitionRecord, SignatureDefinition, SignaturePattern, bundled_definition_package,
-    decode_definition_package, encode_definition_package, is_compressed_definition_package,
+    DEFINITION_PACKAGE_ID, DefinitionPackage, DefinitionPackageDecodeError,
+    DefinitionPackageEncodeError, DefinitionRecord, SignatureDefinition, SignaturePattern,
+    bundled_definition_package,
+    decode_definition_package, decode_definition_package_with_verification, encode_definition_package,
+    encode_definition_package_with_purpose,
 };
 pub use error::StorageError;
 pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};
@@ -36,6 +39,11 @@ pub use operations::{
     delete_directory_async, delete_file_async, move_directory_async, move_file_async,
     read_file_async, read_file_to_string_async, rename_directory_async, rename_file_async,
     write_file_async, write_file_from_reader_async, write_file_string_async,
+};
+pub use rpkg::{
+    CompressionKind, DecodedPackage as DecodedRpkg, PackageMetadata, PackagePurpose,
+    RpkgDecodeError, RpkgEncodeError, RpkgEncodeOptions, SerializationKind, VerificationMode,
+    decode as decode_rpkg, encode as encode_rpkg,
 };
 pub use storage::{DirectoryStorage, FileStorage, SearchScope, StorageEntry};
 pub use watch::{DirectoryWatchHandle, StorageChangeEvent, StorageChangeType, StorageWatchConfig};

@@ -1,9 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rheo_storage::rpkg::{CompressionKind, PackagePurpose, SerializationKind, VerificationMode};
 use rheo_storage::{
-    DefinitionPackage, bundled_definition_package, decode_definition_package,
-    encode_definition_package,
+    DEFINITION_PACKAGE_ID, DefinitionPackage, PackageMetadata, bundled_definition_package,
+    decode_definition_package_with_verification, decode_rpkg, encode_definition_package,
+    encode_definition_package_with_purpose,
 };
 use thiserror::Error;
 use tracing::{debug, info};
@@ -54,30 +56,86 @@ pub(crate) enum BuilderError {
         path: PathBuf,
         message: String,
     },
+
+    /// The TrID source did not expose any usable version values.
+    #[error("failed to determine a usable TrID source version from: {versions}")]
+    MissingSourceVersion { versions: String },
 }
 
 /// Summary information about a definitions package.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageSummary {
-    /// Package format version string.
+    pub(crate) package_id: String,
+    pub(crate) serialization: SerializationKind,
+    pub(crate) compression: CompressionKind,
+    pub(crate) purpose: PackagePurpose,
     pub(crate) package_version: String,
-    /// Reserved tag count carried forward from the legacy package.
+    pub(crate) source_version: String,
+    pub(crate) package_revision: u16,
+    pub(crate) checksum_verified: bool,
     pub(crate) tags: u32,
-    /// Number of definitions in the package.
     pub(crate) definition_count: usize,
 }
 
 impl PackageSummary {
-    pub(crate) fn from_package(package: &DefinitionPackage) -> Self {
+    pub(crate) fn from_loaded(loaded: &LoadedPackage) -> Self {
         Self {
-            package_version: package.package_version.clone(),
-            tags: package.tags,
-            definition_count: package.definitions.len(),
+            package_id: loaded.package_id_string(),
+            serialization: loaded.serialization,
+            compression: loaded.compression,
+            purpose: loaded.purpose,
+            package_version: loaded.metadata.package_version.clone(),
+            source_version: loaded.metadata.source_version.clone(),
+            package_revision: loaded.metadata.package_revision,
+            checksum_verified: loaded.checksum_verified,
+            tags: loaded.package.tags,
+            definition_count: loaded.package.definitions.len(),
         }
     }
 }
 
-pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, BuilderError> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LoadedPackage {
+    pub(crate) package: DefinitionPackage,
+    pub(crate) package_id: [u8; 4],
+    pub(crate) serialization: SerializationKind,
+    pub(crate) compression: CompressionKind,
+    pub(crate) purpose: PackagePurpose,
+    pub(crate) metadata: PackageMetadata,
+    pub(crate) checksum_verified: bool,
+}
+
+impl LoadedPackage {
+    fn package_id_string(&self) -> String {
+        String::from_utf8_lossy(&self.package_id).into_owned()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SyncEmbeddedStatus {
+    Skipped,
+    UpToDate,
+    Updated,
+    NeedsUpdate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncEmbeddedOutcome {
+    pub(crate) input: PathBuf,
+    pub(crate) output: PathBuf,
+    pub(crate) status: SyncEmbeddedStatus,
+    pub(crate) package_version: Option<String>,
+    pub(crate) detail: String,
+}
+
+pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, BuilderError> {
+    load_package_with_verification(path, VerificationMode::Always)
+}
+
+pub(crate) fn load_package_with_verification(
+    path: impl AsRef<Path>,
+    verification_mode: VerificationMode,
+) -> Result<LoadedPackage, BuilderError> {
     let path = path.as_ref();
     info!(path = %path.display(), "loading definitions package");
     let bytes = fs::read(path).map_err(|source| BuilderError::Io {
@@ -85,8 +143,34 @@ pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<DefinitionPackage, 
         path: path.to_path_buf(),
         source,
     })?;
-    decode_definition_package(&bytes).map_err(|err| BuilderError::Package {
+    decode_loaded_package(&bytes, verification_mode)
+}
+
+fn decode_loaded_package(
+    bytes: &[u8],
+    verification_mode: VerificationMode,
+) -> Result<LoadedPackage, BuilderError> {
+    let decoded = decode_rpkg(bytes, verification_mode).map_err(|err| BuilderError::Package {
         message: err.to_string(),
+    })?;
+    let package =
+        decode_definition_package_with_verification(bytes, verification_mode).map_err(|err| {
+            BuilderError::Package {
+                message: err.to_string(),
+            }
+        })?;
+    Ok(LoadedPackage {
+        package,
+        package_id: decoded.package_id,
+        serialization: decoded.serialization,
+        compression: decoded.compression,
+        purpose: decoded.purpose,
+        metadata: decoded.metadata,
+        checksum_verified: match verification_mode {
+            VerificationMode::Always => true,
+            VerificationMode::Skip => false,
+            VerificationMode::Default => decoded.purpose == PackagePurpose::External,
+        },
     })
 }
 
@@ -103,8 +187,16 @@ pub(crate) fn write_package(
     package: &DefinitionPackage,
     path: impl AsRef<Path>,
 ) -> Result<PathBuf, BuilderError> {
+    write_package_with_purpose(package, path, PackagePurpose::External)
+}
+
+pub(crate) fn write_package_with_purpose(
+    package: &DefinitionPackage,
+    path: impl AsRef<Path>,
+    purpose: PackagePurpose,
+) -> Result<PathBuf, BuilderError> {
     let path = path.as_ref().to_path_buf();
-    info!(path = %path.display(), "writing definitions package");
+    info!(path = %path.display(), ?purpose, "writing definitions package");
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| BuilderError::Io {
             operation: "create output directory for",
@@ -113,12 +205,17 @@ pub(crate) fn write_package(
         })?;
     }
 
-    let bytes = encode_definition_package(package).map_err(|err| BuilderError::Package {
+    let bytes = match purpose {
+        PackagePurpose::External => encode_definition_package(package),
+        PackagePurpose::Embedded => encode_definition_package_with_purpose(package, purpose),
+    }
+    .map_err(|err| BuilderError::Package {
         message: err.to_string(),
     })?;
     debug!(
         bytes = bytes.len(),
         definitions = package.definitions.len(),
+        ?purpose,
         "encoded definitions package"
     );
     fs::write(&path, bytes).map_err(|source| BuilderError::Io {
@@ -135,7 +232,7 @@ pub(crate) fn normalize_package(
 ) -> Result<PathBuf, BuilderError> {
     info!("normalizing definitions package");
     let package = load_package(input)?;
-    write_package(&package, output)
+    write_package_with_purpose(&package.package, output, package.purpose)
 }
 
 pub(crate) fn packages_match(
@@ -145,13 +242,116 @@ pub(crate) fn packages_match(
     info!("comparing definitions packages");
     let left = load_package(left)?;
     let right = load_package(right)?;
-    Ok(left == right)
+    Ok(left.package == right.package
+        && left.package_id == right.package_id
+        && left.serialization == right.serialization
+        && left.compression == right.compression
+        && left.purpose == right.purpose
+        && left.metadata == right.metadata)
 }
 
 pub(crate) fn inspect_package(path: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
     info!("inspecting definitions package");
     let package = load_package(path)?;
-    Ok(PackageSummary::from_package(&package))
+    Ok(PackageSummary::from_loaded(&package))
+}
+
+pub(crate) fn sync_embedded_package(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    check_only: bool,
+) -> Result<SyncEmbeddedOutcome, BuilderError> {
+    let input = input.as_ref().to_path_buf();
+    let output = output.as_ref().to_path_buf();
+    info!(
+        input = %input.display(),
+        output = %output.display(),
+        check_only,
+        "syncing embedded definitions package"
+    );
+
+    if !input.exists() {
+        return Ok(SyncEmbeddedOutcome {
+            input,
+            output,
+            status: SyncEmbeddedStatus::Skipped,
+            package_version: None,
+            detail: "TrID archive was not available; skipped embedded package refresh".to_string(),
+        });
+    }
+
+    let build = trid_xml::build_trid_xml_package_with_report(&input)?;
+    let desired_package = build.package;
+    let desired_version = desired_package.package_version.clone();
+
+    let current_state = match load_package(&output) {
+        Ok(current) => current_validity_reason(&current, &desired_package),
+        Err(error) if output.exists() => Some(format!("current embedded package is invalid: {error}")),
+        Err(_) => Some("embedded package is missing".to_string()),
+    };
+
+    let Some(reason) = current_state else {
+        return Ok(SyncEmbeddedOutcome {
+            input,
+            output,
+            status: SyncEmbeddedStatus::UpToDate,
+            package_version: Some(desired_version),
+            detail: "embedded package is already current".to_string(),
+        });
+    };
+
+    if check_only {
+        return Ok(SyncEmbeddedOutcome {
+            input,
+            output,
+            status: SyncEmbeddedStatus::NeedsUpdate,
+            package_version: Some(desired_version),
+            detail: reason,
+        });
+    }
+
+    write_package_with_purpose(&desired_package, &output, PackagePurpose::Embedded)?;
+    Ok(SyncEmbeddedOutcome {
+        input,
+        output,
+        status: SyncEmbeddedStatus::Updated,
+        package_version: Some(desired_version),
+        detail: reason,
+    })
+}
+
+fn current_validity_reason(
+    current: &LoadedPackage,
+    desired: &DefinitionPackage,
+) -> Option<String> {
+    if current.package_id != DEFINITION_PACKAGE_ID {
+        return Some(format!(
+            "embedded package id '{}' does not match 'FDEF'",
+            current.package_id_string()
+        ));
+    }
+    if current.purpose != PackagePurpose::Embedded {
+        return Some("embedded package purpose is not marked as Embedded".to_string());
+    }
+    if current.metadata.package_version != desired.package_version {
+        return Some(format!(
+            "package version mismatch: current='{}', desired='{}'",
+            current.metadata.package_version, desired.package_version
+        ));
+    }
+    if current.metadata.source_version != desired.source_version {
+        return Some(format!(
+            "source version mismatch: current='{}', desired='{}'",
+            current.metadata.source_version, desired.source_version
+        ));
+    }
+    if current.metadata.package_revision != desired.package_revision {
+        return Some(format!(
+            "package revision mismatch: current='{}', desired='{}'",
+            current.metadata.package_revision, desired.package_revision
+        ));
+    }
+    None
 }
 
 #[cfg(test)]
@@ -160,13 +360,14 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    use rheo_storage::decode_definition_package;
-    use rheo_storage::definitions::is_compressed_definition_package;
+    use rheo_storage::{
+        CompressionKind, PackagePurpose, SerializationKind, VerificationMode,
+    };
     use tempfile::tempdir;
 
     use super::{
-        PackageSummary, load_bundled_package, normalize_package, packages_match, trid_xml,
-        write_package,
+        PackageSummary, SyncEmbeddedStatus, load_bundled_package, normalize_package, packages_match,
+        sync_embedded_package, trid_xml, write_package, write_package_with_purpose,
     };
 
     fn fixtures_root() -> PathBuf {
@@ -179,9 +380,8 @@ mod tests {
     #[test]
     fn bundled_package_has_expected_summary() {
         let package = load_bundled_package().expect("bundled package should load");
-        let summary = PackageSummary::from_package(&package);
-
-        assert!(summary.definition_count > 0);
+        assert!(package.package_version.starts_with("trid-"));
+        assert!(package.definitions.len() > 0);
     }
 
     #[test]
@@ -203,7 +403,9 @@ mod tests {
             .expect("fixture directory should build");
 
         assert_eq!(package.tags, 48);
-        assert_eq!(package.package_version, "");
+        assert_eq!(package.source_version, "2.00");
+        assert_eq!(package.package_revision, 1);
+        assert_eq!(package.package_version, "trid-2.00+rpkg.1");
         assert_eq!(package.definitions.len(), 3);
         let png = package
             .definitions
@@ -307,20 +509,127 @@ mod tests {
     }
 
     #[test]
-    fn builder_writes_compressed_rpkg_readable_by_runtime() {
+    fn builder_writes_external_rpkg_readable_by_runtime() {
         let temp = tempdir().expect("temporary directory should exist");
         let output_path = temp.path().join("filedefs.rpkg");
         let build = trid_xml::build_trid_xml_package_with_report(fixtures_root())
             .expect("fixture should build");
 
         write_package(&build.package, &output_path).expect("package should be written");
+        let loaded = super::load_package(&output_path).expect("package should load");
+
+        assert_eq!(loaded.package, build.package);
+        assert_eq!(loaded.purpose, PackagePurpose::External);
+        assert!(loaded.checksum_verified);
+    }
+
+    #[test]
+    fn builder_writes_embedded_packages_that_skip_default_verification() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let output_path = temp.path().join("filedefs.rpkg");
+        let build = trid_xml::build_trid_xml_package_with_report(fixtures_root())
+            .expect("fixture should build");
+
+        write_package_with_purpose(&build.package, &output_path, PackagePurpose::Embedded)
+            .expect("embedded package should be written");
         let bytes = fs::read(&output_path).expect("written package should be readable");
-
-        assert!(is_compressed_definition_package(&bytes));
-
-        let decoded =
-            decode_definition_package(&bytes).expect("runtime should decode compressed rpkg");
+        let decoded = rheo_storage::decode_definition_package(&bytes)
+            .expect("runtime should decode embedded package");
         assert_eq!(decoded, build.package);
+
+        let loaded = super::load_package_with_verification(&output_path, VerificationMode::Always)
+            .expect("builder inspection should verify embedded packages");
+        assert_eq!(loaded.purpose, PackagePurpose::Embedded);
+    }
+
+    #[test]
+    fn inspect_package_reports_v2_metadata() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let output_path = temp.path().join("filedefs.rpkg");
+        let build = trid_xml::build_trid_xml_package_with_report(fixtures_root())
+            .expect("fixture should build");
+        write_package(&build.package, &output_path).expect("package should be written");
+
+        let summary = super::inspect_package(&output_path).expect("summary should load");
+        assert_eq!(
+            summary,
+            PackageSummary {
+                package_id: "FDEF".to_string(),
+                serialization: SerializationKind::MessagePack,
+                compression: CompressionKind::Lz4Frame,
+                purpose: PackagePurpose::External,
+                package_version: "trid-2.00+rpkg.1".to_string(),
+                source_version: "2.00".to_string(),
+                package_revision: 1,
+                checksum_verified: true,
+                tags: 48,
+                definition_count: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn sync_embedded_skips_when_archive_is_missing() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let outcome = sync_embedded_package(
+            temp.path().join("missing.7z"),
+            temp.path().join("filedefs.rpkg"),
+            false,
+        )
+        .expect("sync should succeed");
+
+        assert_eq!(outcome.status, SyncEmbeddedStatus::Skipped);
+    }
+
+    #[test]
+    fn sync_embedded_updates_when_target_is_stale() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let archive_path = temp.path().join("triddefs_xml.7z");
+        let output_path = temp.path().join("filedefs.rpkg");
+
+        let status = Command::new("tar")
+            .arg("-a")
+            .arg("-cf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(fixtures_root())
+            .arg("defs")
+            .status()
+            .expect("tar should create the fixture archive");
+        assert!(status.success(), "tar should create a 7z archive");
+
+        let package = load_bundled_package().expect("bundled package should load");
+        write_package(&package, &output_path).expect("stale package should be written");
+
+        let outcome =
+            sync_embedded_package(&archive_path, &output_path, false).expect("sync should work");
+        assert_eq!(outcome.status, SyncEmbeddedStatus::Updated);
+
+        let loaded = super::load_package(&output_path).expect("updated package should load");
+        assert_eq!(loaded.purpose, PackagePurpose::Embedded);
+        assert_eq!(loaded.metadata.package_version, "trid-2.00+rpkg.1");
+    }
+
+    #[test]
+    fn sync_embedded_check_reports_when_update_is_needed() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let archive_path = temp.path().join("triddefs_xml.7z");
+        let output_path = temp.path().join("filedefs.rpkg");
+
+        let status = Command::new("tar")
+            .arg("-a")
+            .arg("-cf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(fixtures_root())
+            .arg("defs")
+            .status()
+            .expect("tar should create the fixture archive");
+        assert!(status.success(), "tar should create a 7z archive");
+
+        let output =
+            sync_embedded_package(&archive_path, &output_path, true).expect("check should run");
+        assert_eq!(output.status, SyncEmbeddedStatus::NeedsUpdate);
     }
 
     #[test]
@@ -353,5 +662,43 @@ mod tests {
                 && !definition.extensions.is_empty()
                 && !definition.signature.patterns.is_empty()
         }));
+    }
+
+    #[test]
+    fn decode_with_skip_verification_keeps_package_readable() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let output_path = temp.path().join("filedefs.rpkg");
+        let build = trid_xml::build_trid_xml_package_with_report(fixtures_root())
+            .expect("fixture should build");
+
+        write_package_with_purpose(&build.package, &output_path, PackagePurpose::Embedded)
+            .expect("embedded package should be written");
+        let bytes = fs::read(&output_path).expect("written package should be readable");
+        let loaded = super::decode_loaded_package(&bytes, VerificationMode::Skip)
+            .expect("decode should succeed");
+        assert_eq!(loaded.package, build.package);
+    }
+
+    #[test]
+    fn sync_embedded_check_does_not_touch_output() {
+        let temp = tempdir().expect("temporary directory should exist");
+        let archive_path = temp.path().join("triddefs_xml.7z");
+        let output_path = temp.path().join("filedefs.rpkg");
+
+        let status = Command::new("tar")
+            .arg("-a")
+            .arg("-cf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(fixtures_root())
+            .arg("defs")
+            .status()
+            .expect("tar should create the fixture archive");
+        assert!(status.success(), "tar should create a 7z archive");
+
+        let outcome =
+            sync_embedded_package(&archive_path, &output_path, true).expect("check should work");
+        assert_eq!(outcome.status, SyncEmbeddedStatus::NeedsUpdate);
+        assert!(!output_path.exists());
     }
 }
