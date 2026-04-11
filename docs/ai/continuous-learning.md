@@ -16,3 +16,9 @@
 - On Windows, the system `tar` tool can handle `.7z` archives well enough for builder ingestion, which avoids forcing contributors to manually unpack tens of thousands of TrID XML files into the repo.
 - A vendored MIME snapshot keeps transformation runs deterministic and offline while still letting the builder correct broken TrID MIME values back to canonical forms.
 - Upgrading `rpkg` to a compressed format is safest when the runtime dual-reads both old and new payloads, so package improvements do not force a flag day migration.
+
+## 2026-04-11
+- If a repo is explicitly Windows-first, keep CI and docs generation aligned with that truth instead of preserving cross-platform jobs just for symmetry.
+- GitHub Actions must enable Git LFS checkout when tests or embedded assets depend on large binary resources; otherwise LFS pointer text can masquerade as malformed runtime data.
+- Builder UI tests should create the files they depend on instead of assuming a local `package/` folder is already populated on CI runners.
+- Strict clippy settings in CI are useful, but they surface a lot of small style regressions; running the exact package-level clippy commands locally is the fastest way to stabilize the workflow before pushing.
