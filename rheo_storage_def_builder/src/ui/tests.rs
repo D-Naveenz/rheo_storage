@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use tempfile::tempdir;
 
 use crate::BuilderPaths;
 
@@ -26,9 +27,22 @@ fn menu_contains_all_primary_actions() {
 
 #[test]
 fn build_form_uses_default_paths() {
-    let form = FormState::new(MenuAction::BuildTridXml, &sample_paths());
-    assert_eq!(form.fields[0].value, "package\\triddefs_xml.7z");
-    assert_eq!(form.fields[1].value, "output\\filedefs.rpkg");
+    let temp = tempdir().unwrap();
+    let package_dir = temp.path().join("package");
+    let output_dir = temp.path().join("output");
+    std::fs::create_dir_all(&package_dir).unwrap();
+    std::fs::create_dir_all(&output_dir).unwrap();
+    std::fs::write(package_dir.join("triddefs_xml.7z"), b"archive").unwrap();
+
+    let paths = BuilderPaths {
+        package_dir,
+        output_dir,
+        logs_dir: temp.path().join("logs"),
+    };
+    let form = FormState::new(MenuAction::BuildTridXml, &paths);
+
+    assert!(form.fields[0].value.ends_with("triddefs_xml.7z"));
+    assert!(form.fields[1].value.ends_with("filedefs.rpkg"));
 }
 
 #[test]
