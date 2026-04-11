@@ -24,8 +24,9 @@ jobs:
           lfs: true
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: stable
           components: rustfmt
 
       - name: Check formatting
@@ -50,8 +51,9 @@ jobs:
           lfs: true
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: stable
           components: clippy
 
       - name: Run clippy for Rheo crates
@@ -73,7 +75,9 @@ jobs:
           lfs: true
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Run Rheo tests
         run: |
