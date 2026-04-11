@@ -40,6 +40,16 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - License: Apache-2.0
 - Rust edition: 2024
 
+## Release Flow
+
+- Workspace releases are configured through [`cargo release`](https://github.com/crate-ci/cargo-release).
+- Root [release.toml](./release.toml) keeps the workspace on a shared version and creates tags in the form `v<version>`.
+- GitHub Actions release automation lives in [release.yml](./.github/workflows/release.yml).
+- The release workflow is manual by design:
+  - run it with `execute = false` for a dry run
+  - run it with `execute = true` to publish, tag, and push
+- Executed releases require a `CARGO_REGISTRY_TOKEN` repository secret for crates.io publishing.
+
 ## Consumer Docs
 - [Rust consumer](./docs/reference/rust-consumer.md)
 - [WinRT consumer](./docs/reference/winrt-consumer.md)

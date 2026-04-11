@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: Version bump level or explicit semver value
+        required: true
+        default: patch
+        type: string
+      execute:
+        description: Execute the release instead of running a dry run
+        required: true
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: cargo release
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-release
+        run: cargo install cargo-release --locked
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate workspace before release
+        run: |
+          cargo test -p rheo_storage --all-features
+          cargo test -p rheo_storage_def_builder
+          cargo check -p rheo_storage_winrt
+
+      - name: Dry run workspace release
+        if: ${{ !inputs.execute }}
+        run: cargo release ${{ inputs.level }} --workspace --no-confirm --no-verify
+
+      - name: Ensure crates.io token is present
+        if: ${{ inputs.execute }}
+        run: |
+          if (-not $env:CARGO_REGISTRY_TOKEN) {
+            throw "CARGO_REGISTRY_TOKEN is required for execute=true."
+          }
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Execute workspace release
+        if: ${{ inputs.execute }}
+        run: cargo release ${{ inputs.level }} --workspace --execute --no-confirm
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
