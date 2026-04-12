@@ -1,10 +1,10 @@
 //! Rust-native storage analysis primitives for the Rheo rewrite.
 //!
 //! This crate currently focuses on the first two rewrite milestones:
-//! immutable metadata and content-based analysis backed by the legacy
+//! immutable metadata and content-based analysis backed by the bundled
 //! `filedefs.rpkg` package, plus a Rust-native file and directory operations
-//! layer with optional async wrappers. The package loader supports both
-//! legacy plain MessagePack packages and the newer LZ4-wrapped `rpkg` format.
+//! layer with optional async wrappers. The package loader reads filedefs
+//! packages through the shared `rheo_rpkg` container crate.
 
 pub mod analysis;
 pub mod definitions;
@@ -16,9 +16,9 @@ pub mod watch;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};
 pub use definitions::{
-    DefinitionPackage, DefinitionPackageDecodeError, DefinitionPackageEncodeError,
-    DefinitionRecord, SignatureDefinition, SignaturePattern, bundled_definition_package,
-    decode_definition_package, encode_definition_package, is_compressed_definition_package,
+    DEFINITION_PACKAGE_ID, DefinitionPackage, DefinitionPackageDecodeError, DefinitionRecord,
+    SignatureDefinition, SignaturePattern, bundled_definition_package, decode_definition_package,
+    decode_definition_package_with_options, decode_definition_package_payload,
 };
 pub use error::StorageError;
 pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};

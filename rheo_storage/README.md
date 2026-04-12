@@ -9,6 +9,7 @@ It provides:
 - file and directory operations with a fast path for simple work
 - navigation helpers and debounced watching primitives
 - Windows-aware behavior without forcing the whole crate into an ABI-first design
+- read-side filedefs package loading through the shared `rheo_rpkg` container crate
 
 ## Scope
 

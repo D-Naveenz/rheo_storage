@@ -12,7 +12,7 @@ Accepted
 - Start with content-based analysis and immutable metadata before any mutating file or directory features.
 - Once mutation APIs are added, keep a single synchronous core and layer optional async wrappers over it instead of maintaining duplicate behavior trees.
 - Defer FFI and exported DLL concerns until the Rust core is stable and worth wrapping.
-- Preserve the logical `filedefs.rpkg` runtime package contract while allowing the Rust builder to ingest newer TrID XML sources directly from `.7z` archives and emit a compressed LZ4-wrapped package that the runtime can dual-read alongside legacy plain packages.
+- Keep the generic `RPKG` v2 container in a shared crate, `rheo_rpkg`, while letting `rheo_storage` remain a read-side consumer of filedefs packages and `rheo_storage_def_builder` remain the write-side producer from TrID XML sources.
 
 ## Consequences
 - Early milestones can focus on correctness and ergonomics without carrying legacy API constraints.

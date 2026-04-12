@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use rheo_storage::{DefinitionPackage, DefinitionRecord, SignatureDefinition, SignaturePattern};
@@ -14,9 +14,9 @@ mod source;
 use mime::mime_catalog;
 use sluice::{SluiceCandidate, extension_seeds};
 
-const PACKAGE_VERSION: &str = "";
 const VALIDATED_TAGS: u32 = 48;
 const TARGET_DEFINITION_COUNT: usize = 5_500;
+const PACKAGE_REVISION: u16 = 1;
 
 /// Progress stages emitted while transforming TrID XML into a reduced package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -170,6 +170,7 @@ fn build_trid_xml_package_with_report_internal(
         stats: TridBuildStats::default(),
     });
     let parsed = source::load_trid_definitions(source, progress)?;
+    let source_version = determine_source_version(&parsed)?;
     let mut report = TridTransformReport {
         total_parsed: parsed.len(),
         ..TridTransformReport::default()
@@ -329,7 +330,9 @@ fn build_trid_xml_package_with_report_internal(
     );
 
     let package = DefinitionPackage {
-        package_version: PACKAGE_VERSION.to_string(),
+        package_version: format!("trid-{source_version}+rpkg.{PACKAGE_REVISION}"),
+        source_version,
+        package_revision: PACKAGE_REVISION,
         tags: VALIDATED_TAGS,
         definitions: survivors
             .into_iter()
@@ -376,6 +379,7 @@ pub(crate) struct TridSignature {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ParsedTridDefinition {
+    pub(crate) source_version: String,
     pub(crate) file_type: String,
     pub(crate) extensions: Vec<String>,
     pub(crate) mime_type: String,
@@ -405,4 +409,40 @@ fn candidate_to_record(candidate: SluiceCandidate) -> DefinitionRecord {
         },
         priority_level: candidate.score,
     }
+}
+
+fn determine_source_version(parsed: &[ParsedTridDefinition]) -> Result<String, BuilderError> {
+    let versions = parsed
+        .iter()
+        .map(|definition| definition.source_version.trim())
+        .filter(|version| !version.is_empty())
+        .map(ToOwned::to_owned)
+        .collect::<BTreeSet<_>>();
+
+    let Some(source_version) = versions
+        .iter()
+        .max_by(|left, right| version_key(left).cmp(&version_key(right)))
+        .cloned()
+    else {
+        return Err(BuilderError::MissingSourceVersion {
+            versions: "<missing>".to_string(),
+        });
+    };
+
+    if versions.len() > 1 {
+        debug!(
+            selected = %source_version,
+            discovered = ?versions,
+            "multiple TrID source versions were present; selected the highest version"
+        );
+    }
+
+    Ok(source_version)
+}
+
+fn version_key(version: &str) -> Vec<u32> {
+    version
+        .split('.')
+        .map(|segment| segment.parse::<u32>().unwrap_or(0))
+        .collect()
 }

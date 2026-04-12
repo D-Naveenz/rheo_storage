@@ -87,21 +87,20 @@ impl FileInfo {
     /// File type label with performance-aware priority:
     /// cached analysis first, then lazy Windows shell data, then a cheap fallback.
     pub fn type_name(&self) -> String {
-        if let Some(analysis) = self.analysis_if_loaded() {
-            if let Some(found) = analysis
+        if let Some(analysis) = self.analysis_if_loaded()
+            && let Some(found) = analysis
                 .matches
                 .first()
                 .map(|item| item.file_type_label.as_str())
                 .filter(|value| !value.is_empty())
-            {
-                return found.to_owned();
-            }
+        {
+            return found.to_owned();
         }
 
-        if let Some(shell) = self.shell_details() {
-            if let Some(found) = shell.type_name.as_deref().filter(|value| !value.is_empty()) {
-                return found.to_owned();
-            }
+        if let Some(shell) = self.shell_details()
+            && let Some(found) = shell.type_name.as_deref().filter(|value| !value.is_empty())
+        {
+            return found.to_owned();
         }
 
         self.filename_extension()

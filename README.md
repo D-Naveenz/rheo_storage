@@ -4,19 +4,25 @@ Rust-first rewrite of `Rheo.Storage`, focused on secure and idiomatic storage
 APIs, definition-driven file analysis, and Windows-first integration.
 
 ## Workspace
+- `rheo_rpkg`: generic MessagePack-based `RPKG` v2 container crate
 - `rheo_storage`: core runtime library
 - `rheo_storage_def_builder`: definitions package builder, validator, and normalization tool
 - `rheo_storage_winrt`: WinRT-facing wrapper crate for packaged Windows consumers
 
 ## Crates
 
+### `rheo_rpkg`
+- Generic `RPKG` v2 container crate for MessagePack payloads with optional metadata and integrity sections.
+- Used by both the runtime and the builder without pulling TrID-specific behavior into `rheo_storage`.
+
 ### `rheo_storage`
 - Rust-native runtime crate for file analysis, metadata, operations, navigation, and watching.
-- Uses the bundled `filedefs.rpkg` runtime package and supports both legacy plain MessagePack and newer Rheo LZ4-wrapped packages.
+- Uses the bundled `filedefs.rpkg` runtime package and reads filedefs payloads through `rheo_rpkg`.
 
 ### `rheo_storage_def_builder`
 - CLI application for building and inspecting Rheo definitions packages from TrID XML sources.
 - Supports both interactive TUI usage and one-shot command execution.
+- Owns filedefs package serialization plus embedded package refresh through `sync-embedded`.
 
 ### `rheo_storage_winrt`
 - Thin ABI wrapper layer for WinRT-facing consumers.

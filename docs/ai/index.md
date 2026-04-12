@@ -12,5 +12,6 @@
 
 ## Current Focus
 - Keep `rheo_storage` as the source of truth for analysis, metadata, operations, enumeration, and watching.
-- Use `rheo_storage_def_builder` to inspect and normalize the runtime package format.
+- Use `rheo_storage_def_builder` to inspect, normalize, build, and validate the runtime package format.
 - Keep the WinRT ABI layer thin and isolate packaging-specific constraints inside `rheo_storage_winrt`.
+- Treat release automation and CI as part of project memory: Windows-only pipelines and Git LFS-aware checkout are intentional repo rules, not incidental implementation details.

@@ -2,7 +2,6 @@
 name = "rheo_storage_def_builder"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -23,7 +22,9 @@ indicatif = "0.18"
 once_cell = "1.21"
 quick-xml = { version = "0.39.2", features = ["serialize"] }
 ratatui = "0.30.0"
+rheo_rpkg = { path = "../rheo_rpkg" }
 rheo_storage = { path = "../rheo_storage" }
+rmp-serde = "1.3"
 serde = { version = "1.0", features = ["derive"] }
 tempfile = "3.20"
 thiserror = "2.0"

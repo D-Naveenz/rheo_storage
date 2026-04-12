@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "rheo_rpkg",
     "rheo_storage",
     "rheo_storage_def_builder",
     "rheo_storage_winrt",
@@ -7,9 +8,8 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
 authors = ["Naveen Dharmathunga <dasheenaveen@outlook.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/D-Naveenz/rheo_storage"

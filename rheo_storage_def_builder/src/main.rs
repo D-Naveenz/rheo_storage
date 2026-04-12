@@ -84,6 +84,15 @@ enum Command {
         #[arg(long)]
         right: PathBuf,
     },
+    /// Refresh the embedded runtime package from the repo TrID archive when needed.
+    SyncEmbedded {
+        #[arg(short, long)]
+        input: Option<PathBuf>,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -209,6 +218,18 @@ fn resolve_action(command: Command, paths: &BuilderPaths) -> BuilderAction {
             output: output.unwrap_or_else(|| paths.default_package_output_path()),
         },
         Command::Verify { left, right } => BuilderAction::Verify { left, right },
+        Command::SyncEmbedded {
+            input,
+            output,
+            check,
+        } => {
+            let (default_input, default_output) = default_embedded_sync_paths();
+            BuilderAction::SyncEmbedded {
+                input: input.unwrap_or(default_input),
+                output: output.unwrap_or(default_output),
+                check,
+            }
+        }
     }
 }
 
@@ -278,6 +299,32 @@ fn first_matching_file(directory: &Path, extension: &str) -> Option<PathBuf> {
     matches.into_iter().next()
 }
 
+fn default_embedded_sync_paths() -> (PathBuf, PathBuf) {
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let workspace_root = find_workspace_root(&current_dir).unwrap_or(current_dir);
+    (
+        workspace_root
+            .join("rheo_storage_def_builder")
+            .join("package")
+            .join("triddefs_xml.7z"),
+        workspace_root
+            .join("rheo_storage")
+            .join("resources")
+            .join("filedefs.rpkg"),
+    )
+}
+
+fn find_workspace_root(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .find(|candidate| {
+            candidate.join("Cargo.toml").exists()
+                && candidate.join("rheo_storage").is_dir()
+                && candidate.join("rheo_storage_def_builder").is_dir()
+        })
+        .map(Path::to_path_buf)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -286,7 +333,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        BuilderPaths, Cli, Command, LaunchMode, determine_launch_mode, resolve_default_trid_source,
+        BuilderPaths, Cli, Command, LaunchMode, default_embedded_sync_paths,
+        determine_launch_mode, find_workspace_root, resolve_default_trid_source,
     };
 
     #[test]
@@ -337,5 +385,45 @@ mod tests {
         let command = Command::Inspect { input: None };
         let mode = determine_launch_mode(Some(&command), false, true, true);
         assert_eq!(mode, LaunchMode::Direct);
+    }
+
+    #[test]
+    fn workspace_root_detection_finds_repo_shape() {
+        let temp = tempdir().unwrap();
+        fs::create_dir_all(temp.path().join("rheo_storage")).unwrap();
+        fs::create_dir_all(temp.path().join("rheo_storage_def_builder")).unwrap();
+        fs::write(temp.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+
+        let nested = temp.path().join("rheo_storage_def_builder").join("src");
+        fs::create_dir_all(&nested).unwrap();
+        assert_eq!(find_workspace_root(&nested), Some(temp.path().to_path_buf()));
+    }
+
+    #[test]
+    fn embedded_sync_defaults_point_to_workspace_paths() {
+        let temp = tempdir().unwrap();
+        fs::create_dir_all(temp.path().join("rheo_storage")).unwrap();
+        fs::create_dir_all(temp.path().join("rheo_storage_def_builder")).unwrap();
+        fs::write(temp.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(temp.path()).unwrap();
+        let defaults = default_embedded_sync_paths();
+        std::env::set_current_dir(original).unwrap();
+
+        assert_eq!(
+            defaults.0,
+            temp.path()
+                .join("rheo_storage_def_builder")
+                .join("package")
+                .join("triddefs_xml.7z")
+        );
+        assert_eq!(
+            defaults.1,
+            temp.path()
+                .join("rheo_storage")
+                .join("resources")
+                .join("filedefs.rpkg")
+        );
     }
 }
