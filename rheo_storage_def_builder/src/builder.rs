@@ -444,7 +444,7 @@ mod tests {
     fn bundled_package_has_expected_summary() {
         let package = load_bundled_package().expect("bundled package should load");
         assert!(package.package_version.starts_with("trid-"));
-        assert!(package.definitions.len() > 0);
+        assert!(!package.definitions.is_empty());
     }
 
     #[test]

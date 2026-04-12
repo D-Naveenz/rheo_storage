@@ -459,10 +459,10 @@ fn encode_sections(descriptors: &[SectionDescriptor]) -> Vec<u8> {
     bytes
 }
 
-fn find_section<'a>(
-    sections: &'a [SectionDescriptor],
+fn find_section(
+    sections: &[SectionDescriptor],
     kind: SectionKind,
-) -> Option<&'a SectionDescriptor> {
+) -> Option<&SectionDescriptor> {
     sections.iter().find(|section| section.kind == kind)
 }
 
