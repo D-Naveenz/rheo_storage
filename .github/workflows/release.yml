@@ -57,8 +57,9 @@ jobs:
       - name: Validate workspace before release
         run: |
           cargo test -p rheo_storage --all-features
+          cargo test -p rheo_storage_ffi
           cargo test -p rheo_storage_def_builder
-          cargo check -p rheo_storage_winrt
+          dotnet run --configuration Release --project bindings/dotnet/Rheo.Storage.TestHost/Rheo.Storage.TestHost.csproj
 
       - name: Dry run workspace release
         if: ${{ !inputs.execute }}

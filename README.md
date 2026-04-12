@@ -6,8 +6,8 @@ APIs, definition-driven file analysis, and Windows-first integration.
 ## Workspace
 - `rheo_rpkg`: generic MessagePack-based `RPKG` v2 container crate
 - `rheo_storage`: core runtime library
+- `rheo_storage_ffi`: native C ABI wrapper crate for .NET and other FFI consumers
 - `rheo_storage_def_builder`: definitions package builder, validator, and normalization tool
-- `rheo_storage_winrt`: WinRT-facing wrapper crate for packaged Windows consumers
 
 ## Crates
 
@@ -19,14 +19,14 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - Rust-native runtime crate for file analysis, metadata, operations, navigation, and watching.
 - Uses the bundled `filedefs.rpkg` runtime package and reads filedefs payloads through `rheo_rpkg`.
 
+### `rheo_storage_ffi`
+- Thin native interop layer over `rheo_storage`.
+- Exposes a stable path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, and raw byte buffers for file reads.
+
 ### `rheo_storage_def_builder`
 - CLI application for building and inspecting Rheo definitions packages from TrID XML sources.
 - Supports both interactive TUI usage and one-shot command execution.
 - Owns filedefs package serialization plus embedded package refresh through `sync-embedded`.
-
-### `rheo_storage_winrt`
-- Thin ABI wrapper layer for WinRT-facing consumers.
-- Delegates runtime behavior to `rheo_storage`.
 
 ## Builder Package Assets
 - `rheo_storage_def_builder/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
@@ -58,4 +58,4 @@ APIs, definition-driven file analysis, and Windows-first integration.
 
 ## Consumer Docs
 - [Rust consumer](./docs/reference/rust-consumer.md)
-- [WinRT consumer](./docs/reference/winrt-consumer.md)
+- [.NET consumer](./docs/reference/dotnet-consumer.md)

@@ -333,8 +333,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        BuilderPaths, Cli, Command, LaunchMode, default_embedded_sync_paths,
-        determine_launch_mode, find_workspace_root, resolve_default_trid_source,
+        BuilderPaths, Cli, Command, LaunchMode, default_embedded_sync_paths, determine_launch_mode,
+        find_workspace_root, resolve_default_trid_source,
     };
 
     #[test]
@@ -396,7 +396,10 @@ mod tests {
 
         let nested = temp.path().join("rheo_storage_def_builder").join("src");
         fs::create_dir_all(&nested).unwrap();
-        assert_eq!(find_workspace_root(&nested), Some(temp.path().to_path_buf()));
+        assert_eq!(
+            find_workspace_root(&nested),
+            Some(temp.path().to_path_buf())
+        );
     }
 
     #[test]

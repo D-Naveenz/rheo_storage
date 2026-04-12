@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))\</RepoRoot>
+    <NativeConfiguration Condition="'$(Configuration)' == 'Release'">release</NativeConfiguration>
+    <NativeConfiguration Condition="'$(NativeConfiguration)' == ''">debug</NativeConfiguration>
+    <NativeCargoArgs Condition="'$(Configuration)' == 'Release'">--release</NativeCargoArgs>
+    <NativeDllPath>$(RepoRoot)target\$(NativeConfiguration)\rheo_storage_ffi.dll</NativeDllPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rheo.Storage\Rheo.Storage.csproj" />
+  </ItemGroup>
+
+  <Target Name="BuildAndCopyNativeLibrary" BeforeTargets="Build">
+    <Exec Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" WorkingDirectory="$(RepoRoot)" />
+    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

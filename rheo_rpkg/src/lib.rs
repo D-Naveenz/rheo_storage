@@ -240,10 +240,10 @@ impl RpkgReader {
         bytes: &[u8],
         header: &PackageHeader,
     ) -> Result<Vec<SectionDescriptor>, RpkgDecodeError> {
-        let section_table_offset =
-            usize::try_from(header.section_table_offset).map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
-        let section_table_len =
-            usize::try_from(header.section_table_len).map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
+        let section_table_offset = usize::try_from(header.section_table_offset)
+            .map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
+        let section_table_len = usize::try_from(header.section_table_len)
+            .map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
         let table_end = section_table_offset
             .checked_add(section_table_len)
             .ok_or(RpkgDecodeError::InvalidSectionTable)?;
@@ -368,9 +368,17 @@ impl RpkgWriter {
         };
 
         let mut sections = Vec::with_capacity(3);
-        sections.push((SectionKind::Payload, PAYLOAD_FORMAT_MESSAGEPACK, payload_section));
+        sections.push((
+            SectionKind::Payload,
+            PAYLOAD_FORMAT_MESSAGEPACK,
+            payload_section,
+        ));
         if let Some(metadata) = &options.metadata {
-            sections.push((SectionKind::Metadata, METADATA_FORMAT_MESSAGEPACK, metadata.clone()));
+            sections.push((
+                SectionKind::Metadata,
+                METADATA_FORMAT_MESSAGEPACK,
+                metadata.clone(),
+            ));
         }
         if options.integrity == IntegrityKind::Sha256 {
             sections.push((SectionKind::Integrity, INTEGRITY_FORMAT_SHA256, vec![0; 32]));
@@ -459,10 +467,7 @@ fn encode_sections(descriptors: &[SectionDescriptor]) -> Vec<u8> {
     bytes
 }
 
-fn find_section(
-    sections: &[SectionDescriptor],
-    kind: SectionKind,
-) -> Option<&SectionDescriptor> {
+fn find_section(sections: &[SectionDescriptor], kind: SectionKind) -> Option<&SectionDescriptor> {
     sections.iter().find(|section| section.kind == kind)
 }
 
@@ -470,9 +475,13 @@ fn read_section_bytes<'a>(
     bytes: &'a [u8],
     descriptor: &SectionDescriptor,
 ) -> Result<&'a [u8], RpkgDecodeError> {
-    let start = usize::try_from(descriptor.offset).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
-    let len = usize::try_from(descriptor.length).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
-    let end = start.checked_add(len).ok_or(RpkgDecodeError::InvalidSectionRange)?;
+    let start =
+        usize::try_from(descriptor.offset).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
+    let len =
+        usize::try_from(descriptor.length).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
+    let end = start
+        .checked_add(len)
+        .ok_or(RpkgDecodeError::InvalidSectionRange)?;
     if end > bytes.len() {
         return Err(RpkgDecodeError::InvalidSectionRange);
     }
@@ -533,10 +542,8 @@ fn compute_integrity_digest(
 #[cfg(test)]
 mod tests {
     use super::{
-        CompressionKind, IntegrityKind, METADATA_FORMAT_MESSAGEPACK, PackageHeader,
-        PackagePurpose,
-        RpkgDecodeError, RpkgReadOptions, RpkgReader, RpkgWriteOptions, RpkgWriter,
-        SectionKind,
+        CompressionKind, IntegrityKind, METADATA_FORMAT_MESSAGEPACK, PackageHeader, PackagePurpose,
+        RpkgDecodeError, RpkgReadOptions, RpkgReader, RpkgWriteOptions, RpkgWriter, SectionKind,
     };
 
     #[test]

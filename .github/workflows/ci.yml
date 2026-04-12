@@ -32,8 +32,8 @@ jobs:
       - name: Check formatting
         run: |
           cargo fmt -p rheo_storage --check
+          cargo fmt -p rheo_storage_ffi --check
           cargo fmt -p rheo_storage_def_builder --check
-          cargo fmt -p rheo_storage_winrt --check
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -59,8 +59,8 @@ jobs:
       - name: Run clippy for Rheo crates
         run: |
           cargo clippy -p rheo_storage --all-targets --all-features -- -D warnings
+          cargo clippy -p rheo_storage_ffi --all-targets -- -D warnings
           cargo clippy -p rheo_storage_def_builder --all-targets -- -D warnings
-          cargo clippy -p rheo_storage_winrt --all-targets -- -D warnings
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -82,8 +82,9 @@ jobs:
       - name: Run Rheo tests
         run: |
           cargo test -p rheo_storage --all-features
+          cargo test -p rheo_storage_ffi
           cargo test -p rheo_storage_def_builder
-          cargo check -p rheo_storage_winrt
+          dotnet run --project bindings/dotnet/Rheo.Storage.TestHost/Rheo.Storage.TestHost.csproj
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -103,7 +104,7 @@ jobs:
       - name: Build docs for Rheo crates
         run: |
           cargo doc -p rheo_storage --no-deps --all-features
-          cargo doc -p rheo_storage_winrt --no-deps
+          cargo doc -p rheo_storage_ffi --no-deps
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2

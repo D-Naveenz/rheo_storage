@@ -129,14 +129,7 @@ pub(crate) struct FiledefsPackageMetadata {
 }
 
 #[derive(Debug, Serialize)]
-struct RawPackageOut(
-    String,
-    String,
-    u16,
-    (),
-    u32,
-    Vec<DefinitionRecord>,
-);
+struct RawPackageOut(String, String, u16, (), u32, Vec<DefinitionRecord>);
 
 pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, BuilderError> {
     let path = path.as_ref();
@@ -179,10 +172,11 @@ pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, Buil
                 }
             })
         })?;
-    let definitions =
-        decode_definition_package_payload(&package.payload).map_err(|err| BuilderError::Package {
+    let definitions = decode_definition_package_payload(&package.payload).map_err(|err| {
+        BuilderError::Package {
             message: err.to_string(),
-        })?;
+        }
+    })?;
     if definitions.package_version != metadata.package_version
         || definitions.source_version != metadata.source_version
         || definitions.package_revision != metadata.package_revision
@@ -324,7 +318,9 @@ pub(crate) fn sync_embedded_package(
 
     let current_state = match load_package(&output) {
         Ok(current) => current_validity_reason(&current, &desired_package),
-        Err(error) if output.exists() => Some(format!("current embedded package is invalid: {error}")),
+        Err(error) if output.exists() => {
+            Some(format!("current embedded package is invalid: {error}"))
+        }
         Err(_) => Some("embedded package is missing".to_string()),
     };
 
@@ -358,10 +354,7 @@ pub(crate) fn sync_embedded_package(
     })
 }
 
-fn current_validity_reason(
-    current: &LoadedPackage,
-    desired: &DefinitionPackage,
-) -> Option<String> {
+fn current_validity_reason(current: &LoadedPackage, desired: &DefinitionPackage) -> Option<String> {
     if current.package_id != DEFINITION_PACKAGE_ID {
         return Some(format!(
             "embedded package id '{}' does not match 'FDEF'",
@@ -429,8 +422,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        PackageSummary, SyncEmbeddedStatus, load_bundled_package, normalize_package, packages_match,
-        sync_embedded_package, trid_xml, write_package, write_package_with_purpose,
+        PackageSummary, SyncEmbeddedStatus, load_bundled_package, normalize_package,
+        packages_match, sync_embedded_package, trid_xml, write_package, write_package_with_purpose,
     };
 
     fn fixtures_root() -> PathBuf {

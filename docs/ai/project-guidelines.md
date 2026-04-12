@@ -22,9 +22,14 @@
   - path-based storage handles that layer cleanly over the operation core
   - recursive directory copy, move, and delete
   - directory navigation and debounced watching
-- Exclude:
-  - .NET interop and exported DLL design
-  - operation-triggered metadata or analysis loading unless the caller requests it
+-  - operation-triggered metadata or analysis loading unless the caller requests it
+
+## .NET Interop Scope
+- Use `rheo_storage_ffi` as the only native ABI layer for .NET consumers.
+- Keep the FFI surface path-based and UTF-8 oriented instead of mirroring Rust handle types.
+- Keep rich FFI payloads JSON-based unless a clear performance bottleneck justifies lower-level ABI structs.
+- Keep the managed `bindings/dotnet/Rheo.Storage` package ergonomic and modern without forcing .NET object-shape concerns back into `rheo_storage`.
+- Leave watchers, async exports, and progress callbacks out of the initial .NET wrapper until the core synchronous surface is stable.
 
 ## Builder Scope
 - `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
@@ -36,7 +41,7 @@
 - Treat the interactive TUI and one-shot CLI as two front ends over one shared command runner instead of separate execution paths.
 
 ## ABI Layer Rules
-- Keep COM and WinRT crates thin over the core runtime.
+- Keep ABI crates thin over the core runtime.
 - Do not fork file-system behavior between ABI layers.
 - If an ABI-specific type restriction appears, solve it in the wrapper crate rather than reshaping the Rust core.
 

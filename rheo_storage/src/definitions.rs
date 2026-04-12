@@ -34,7 +34,6 @@ pub enum DefinitionPackageDecodeError {
 
     #[error("unexpected package identifier '{found}'")]
     InvalidPackageId { found: String },
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -217,25 +216,18 @@ pub(crate) fn database() -> Result<&'static DefinitionDatabase, StorageError> {
 #[cfg(test)]
 mod tests {
     use rheo_rpkg::{
-        CompressionKind, IntegrityKind, PackagePurpose, RPKG_MAGIC, RpkgReadOptions, RpkgWriter,
-        RpkgWriteOptions,
+        CompressionKind, IntegrityKind, PackagePurpose, RPKG_MAGIC, RpkgReadOptions,
+        RpkgWriteOptions, RpkgWriter,
     };
     use serde::Serialize;
 
     use super::{
-        DefinitionPackage, DEFINITION_PACKAGE_ID, bundled_definition_package, database,
+        DEFINITION_PACKAGE_ID, DefinitionPackage, bundled_definition_package, database,
         decode_definition_package, decode_definition_package_payload,
     };
 
     #[derive(Serialize)]
-    struct RawPackageOut(
-        String,
-        String,
-        u16,
-        (),
-        u32,
-        Vec<super::DefinitionRecord>,
-    );
+    struct RawPackageOut(String, String, u16, (), u32, Vec<super::DefinitionRecord>);
 
     fn encode_test_package(package: &DefinitionPackage, purpose: PackagePurpose) -> Vec<u8> {
         let payload = rmp_serde::to_vec(&RawPackageOut(

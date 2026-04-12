@@ -23,3 +23,7 @@
 - Builder UI tests should create the files they depend on instead of assuming a local `package/` folder is already populated on CI runners.
 - Strict clippy settings in CI are useful, but they surface a lot of small style regressions; running the exact package-level clippy commands locally is the fastest way to stabilize the workflow before pushing.
 - A purpose-driven fast-path package design is more reliable when payload version fields are part of the MessagePack payload itself and integrity lives in a dedicated section instead of inside metadata.
+
+## 2026-04-12
+- For a Windows desktop .NET audience, a narrow C ABI plus a managed wrapper is simpler to ship and reason about than carrying WinRT packaging constraints through the whole interop story.
+- JSON payloads are a practical first ABI contract for Rust-to-.NET interop when the foreign language is C# and the richer object model lives in the managed wrapper.

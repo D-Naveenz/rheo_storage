@@ -7,12 +7,27 @@ use crate::builder::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BuilderAction {
-    Pack { output: PathBuf },
-    BuildTridXml { input: PathBuf, output: PathBuf },
-    Inspect { input: PathBuf },
-    InspectTridXml { input: PathBuf },
-    Normalize { input: PathBuf, output: PathBuf },
-    Verify { left: PathBuf, right: PathBuf },
+    Pack {
+        output: PathBuf,
+    },
+    BuildTridXml {
+        input: PathBuf,
+        output: PathBuf,
+    },
+    Inspect {
+        input: PathBuf,
+    },
+    InspectTridXml {
+        input: PathBuf,
+    },
+    Normalize {
+        input: PathBuf,
+        output: PathBuf,
+    },
+    Verify {
+        left: PathBuf,
+        right: PathBuf,
+    },
     SyncEmbedded {
         input: PathBuf,
         output: PathBuf,
@@ -105,7 +120,14 @@ where
                     field("Package Version", summary.package_version),
                     field("Source Version", summary.source_version),
                     field("Package Revision", summary.package_revision.to_string()),
-                    field("Checksum", if summary.checksum_verified { "verified" } else { "skipped" }),
+                    field(
+                        "Checksum",
+                        if summary.checksum_verified {
+                            "verified"
+                        } else {
+                            "skipped"
+                        },
+                    ),
                     field("Tags", summary.tags.to_string()),
                     field("Definitions", summary.definition_count.to_string()),
                     field("Log", log_path.display().to_string()),
