@@ -23,12 +23,13 @@ pub use definitions::{
 pub use error::StorageError;
 pub use info::{DirectoryInfo, DirectorySummary, FileInfo, SizeUnit, StorageMetadata, format_size};
 pub use operations::{
-    DirectoryDeleteOptions, ProgressReporter, ReadOptions, SharedProgressReporter, StorageProgress,
-    TransferOptions, WriteOptions, copy_directory, copy_directory_with_options, copy_file,
-    copy_file_with_options, create_directory, create_directory_all, delete_directory,
-    delete_directory_with_options, delete_file, move_directory, move_directory_with_options,
-    move_file, move_file_with_options, read_file, read_file_to_string, rename_directory,
-    rename_file, write_file, write_file_from_reader, write_file_string,
+    DirectoryDeleteOptions, ProgressReporter, ReadOptions, SharedProgressReporter,
+    StorageCancellationToken, StorageProgress, TransferOptions, WriteOptions, copy_directory,
+    copy_directory_with_options, copy_file, copy_file_with_options, create_directory,
+    create_directory_all, delete_directory, delete_directory_with_options, delete_file,
+    move_directory, move_directory_with_options, move_file, move_file_with_options, read_file,
+    read_file_to_string, rename_directory, rename_file, write_file, write_file_from_reader,
+    write_file_string,
 };
 #[cfg(feature = "async-tokio")]
 pub use operations::{

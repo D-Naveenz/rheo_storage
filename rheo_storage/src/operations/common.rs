@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Instant;
 
@@ -25,6 +26,29 @@ pub struct StorageProgress {
     pub bytes_transferred: u64,
     /// Best-effort average transfer speed in bytes per second.
     pub bytes_per_second: f64,
+}
+
+/// Cooperative cancellation token for long-running storage operations.
+#[derive(Debug, Clone, Default)]
+pub struct StorageCancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl StorageCancellationToken {
+    /// Create a new uncancelled token.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Mark the token as cancelled.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+
+    /// Returns true when cancellation has been requested.
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
 }
 
 /// Callback interface for optional storage progress reporting.
@@ -53,6 +77,8 @@ pub struct TransferOptions {
     pub buffer_size: Option<usize>,
     /// Optional progress callback. When omitted, the fastest available path is used.
     pub progress: Option<SharedProgressReporter>,
+    /// Optional cancellation token for cooperative cancellation.
+    pub cancellation_token: Option<StorageCancellationToken>,
 }
 
 /// Common options for byte-oriented read operations.
@@ -62,6 +88,8 @@ pub struct ReadOptions {
     pub buffer_size: Option<usize>,
     /// Optional progress callback. When omitted, the fastest available path is used.
     pub progress: Option<SharedProgressReporter>,
+    /// Optional cancellation token for cooperative cancellation.
+    pub cancellation_token: Option<StorageCancellationToken>,
 }
 
 /// Common options for file write operations.
@@ -75,6 +103,8 @@ pub struct WriteOptions {
     pub buffer_size: Option<usize>,
     /// Optional progress callback. When omitted, the fastest available path is used.
     pub progress: Option<SharedProgressReporter>,
+    /// Optional cancellation token for cooperative cancellation.
+    pub cancellation_token: Option<StorageCancellationToken>,
 }
 
 impl Default for WriteOptions {
@@ -84,20 +114,26 @@ impl Default for WriteOptions {
             create_parent_directories: true,
             buffer_size: None,
             progress: None,
+            cancellation_token: None,
         }
     }
 }
 
 /// Options for directory deletion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct DirectoryDeleteOptions {
     /// Delete the directory recursively when true.
     pub recursive: bool,
+    /// Optional cancellation token for cooperative cancellation.
+    pub cancellation_token: Option<StorageCancellationToken>,
 }
 
 impl Default for DirectoryDeleteOptions {
     fn default() -> Self {
-        Self { recursive: true }
+        Self {
+            recursive: true,
+            cancellation_token: None,
+        }
     }
 }
 
@@ -275,12 +311,14 @@ pub(crate) fn copy_reader_to_writer<R, W>(
     total_bytes: Option<u64>,
     buffer_size: usize,
     progress: Option<&SharedProgressReporter>,
+    cancellation_token: Option<&StorageCancellationToken>,
+    operation: &'static str,
 ) -> Result<u64, StorageError>
 where
     R: Read,
     W: Write,
 {
-    if progress.is_none() {
+    if progress.is_none() && cancellation_token.is_none() {
         return io::copy(reader, writer).map_err(|err| StorageError::reader_io("copy from", err));
     }
 
@@ -289,6 +327,7 @@ where
     let start = Instant::now();
 
     loop {
+        ensure_not_cancelled(cancellation_token, operation)?;
         let read = reader
             .read(&mut buffer)
             .map_err(|err| StorageError::reader_io("read from", err))?;
@@ -327,6 +366,17 @@ pub(crate) fn report_progress(
         bytes_transferred,
         bytes_per_second,
     });
+}
+
+pub(crate) fn ensure_not_cancelled(
+    cancellation_token: Option<&StorageCancellationToken>,
+    operation: &'static str,
+) -> Result<(), StorageError> {
+    if cancellation_token.is_some_and(StorageCancellationToken::is_cancelled) {
+        return Err(StorageError::cancelled(operation));
+    }
+
+    Ok(())
 }
 
 pub(crate) fn open_source_file(path: &Path) -> Result<File, StorageError> {

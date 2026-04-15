@@ -54,6 +54,10 @@ pub enum StorageError {
     #[error("failed to load embedded file definitions: {message}")]
     DefinitionsLoad { message: String },
 
+    /// The requested operation was cancelled before completion.
+    #[error("operation cancelled while attempting to {operation}")]
+    Cancelled { operation: &'static str },
+
     /// An async runtime task failed before the storage operation completed.
     #[error("async runtime failed to {operation}: {message}")]
     AsyncRuntime {
@@ -98,6 +102,10 @@ impl StorageError {
             path: path.into(),
             message,
         }
+    }
+
+    pub(crate) fn cancelled(operation: &'static str) -> Self {
+        Self::Cancelled { operation }
     }
 
     #[cfg(feature = "async-tokio")]

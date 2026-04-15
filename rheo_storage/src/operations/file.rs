@@ -37,7 +37,7 @@ pub fn copy_file_with_options(
     lock_write_targets(&[&source, &destination], || {
         prepare_destination_file(&destination, options.overwrite, true)?;
 
-        if options.progress.is_none() {
+        if options.progress.is_none() && options.cancellation_token.is_none() {
             if options.overwrite && destination.exists() {
                 fs::remove_file(&destination).map_err(|err| {
                     StorageError::io("remove file before overwrite", &destination, err)
@@ -61,6 +61,8 @@ pub fn copy_file_with_options(
             Some(total_bytes),
             buffer_size,
             options.progress.as_ref(),
+            options.cancellation_token.as_ref(),
+            "copy file",
         )?;
 
         Ok(destination.clone())
@@ -89,6 +91,7 @@ pub fn move_file_with_options(
     }
 
     lock_write_targets(&[&source, &destination], || {
+        super::common::ensure_not_cancelled(options.cancellation_token.as_ref(), "move file")?;
         prepare_destination_file(&destination, options.overwrite, true)?;
 
         if same_volume(&source, &destination) {
@@ -186,7 +189,7 @@ pub fn write_file_from_reader(
             options.create_parent_directories,
         )?;
 
-        if options.progress.is_none() {
+        if options.progress.is_none() && options.cancellation_token.is_none() {
             let mut file = open_destination_file(&destination, options.overwrite)?;
             std::io::copy(reader, &mut file)
                 .map_err(|err| StorageError::reader_io("write file from reader", err))?;
@@ -201,6 +204,8 @@ pub fn write_file_from_reader(
             None,
             buffer_size,
             options.progress.as_ref(),
+            options.cancellation_token.as_ref(),
+            "write file",
         )?;
 
         Ok(destination.clone())
@@ -213,7 +218,7 @@ pub(crate) fn read_file_with_options(
 ) -> Result<Vec<u8>, StorageError> {
     let path = normalize_existing_file(path)?;
 
-    if options.progress.is_none() {
+    if options.progress.is_none() && options.cancellation_token.is_none() {
         return fs::read(&path).map_err(|err| StorageError::io("read file", &path, err));
     }
 
@@ -229,6 +234,8 @@ pub(crate) fn read_file_with_options(
         Some(total_bytes),
         buffer_size,
         options.progress.as_ref(),
+        options.cancellation_token.as_ref(),
+        "read file",
     )?;
     Ok(buffer)
 }
