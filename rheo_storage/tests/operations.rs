@@ -42,6 +42,7 @@ fn copy_file_with_progress_reports_completion() {
             overwrite: false,
             buffer_size: Some(8 * 1024),
             progress: Some(reporter),
+            cancellation_token: None,
         },
     )
     .unwrap();
@@ -100,6 +101,7 @@ fn copy_directory_with_progress_preserves_tree() {
             overwrite: false,
             buffer_size: Some(4 * 1024),
             progress: Some(reporter),
+            cancellation_token: None,
         },
     )
     .unwrap();
@@ -151,7 +153,10 @@ fn directory_storage_delete_can_be_non_recursive() {
     let directory = DirectoryStorage::from_existing(&path).unwrap();
 
     let err = directory
-        .delete_with_options(DirectoryDeleteOptions { recursive: false })
+        .delete_with_options(DirectoryDeleteOptions {
+            recursive: false,
+            cancellation_token: None,
+        })
         .unwrap_err();
 
     assert!(matches!(err, StorageError::Io { .. }));
