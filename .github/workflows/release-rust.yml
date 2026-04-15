@@ -1,4 +1,4 @@
-name: Release
+name: Release Rust Workspace
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-rust-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -56,8 +56,10 @@ jobs:
 
       - name: Validate workspace before release
         run: |
+          cargo run -p rheo_repo_tool -- verify release
           cargo test -p rheo_storage --all-features
           cargo test -p rheo_storage_ffi
+          cargo test -p rheo_repo_tool
           cargo test -p rheo_storage_def_builder
           dotnet test --configuration Release bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
 

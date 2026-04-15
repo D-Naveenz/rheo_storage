@@ -1,0 +1,29 @@
+[versions]
+rust_workspace = "0.2.0"
+nuget_package = "2.0.0"
+
+[nuget]
+package_id = "Rheo.Storage"
+source = "https://api.nuget.org/v3/index.json"
+authors = ["Naveen Dharmathunga"]
+description = "High-level .NET bindings for the native Rheo Storage Rust runtime."
+tags = [
+  "storage",
+  "ffi",
+  "rust",
+  "analysis",
+  "file-handling",
+  "directory-management",
+  "watching",
+]
+readme = "bindings/dotnet/Rheo.Storage/README.md"
+icon = "bindings/dotnet/Rheo.Storage/icon-small.png"
+repository_url = "https://github.com/D-Naveenz/rheo_storage"
+project_url = "https://github.com/D-Naveenz/rheo_storage"
+
+[ci]
+smoke_project = "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj"
+package_project = "bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj"
+tests_project = "bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"
+environment = "nuget-production"
+runtime = "win-x64"

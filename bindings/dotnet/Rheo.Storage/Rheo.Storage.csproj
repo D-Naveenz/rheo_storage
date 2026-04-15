@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -8,29 +8,34 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
     <PackageId>Rheo.Storage</PackageId>
+    <Version>2.0.0</Version>
     <Description>High-level .NET bindings for the native Rheo Storage Rust runtime.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon-small.png</PackageIcon>
     <RepositoryUrl>https://github.com/D-Naveenz/rheo_storage</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/D-Naveenz/rheo_storage</PackageProjectUrl>
     <Authors>Naveen Dharmathunga</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageTags>storage;ffi;rust;analysis;file-handling;directory-management;watching</PackageTags>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))\</RepoRoot>
-    <NativeConfiguration Condition="'$(Configuration)' == 'Release'">release</NativeConfiguration>
-    <NativeConfiguration Condition="'$(NativeConfiguration)' == ''">debug</NativeConfiguration>
-    <NativeCargoArgs Condition="'$(Configuration)' == 'Release'">--release</NativeCargoArgs>
+    <NativeConfiguration Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">release</NativeConfiguration>
+    <NativeConfiguration Condition="&apos;$(NativeConfiguration)&apos; == &apos;&apos;">debug</NativeConfiguration>
+    <NativeCargoArgs Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">--release</NativeCargoArgs>
     <NativeDllPath>$(RepoRoot)target\$(NativeConfiguration)\rheo_storage_ffi.dll</NativeDllPath>
   </PropertyGroup>
-
+  <ItemGroup>
+    <None Include="$(NativeDllPath)" PackagePath="runtimes\win-x64\native" Visible="false" Pack="true" />
+  </ItemGroup>
+  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild;Pack">
+    <Exec WorkingDirectory="$(RepoRoot)" Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" />
+  </Target>
+  <Target AfterTargets="Build" Name="CopyNativeLibraryToOutput">
+    <Copy SkipUnchangedFiles="true" SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" />
+  </Target>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
-    <None Include="$(NativeDllPath)" Pack="true" PackagePath="runtimes\win-x64\native" Visible="false" />
   </ItemGroup>
-
-  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild;Pack">
-    <Exec Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" WorkingDirectory="$(RepoRoot)" />
-  </Target>
-
-  <Target Name="CopyNativeLibraryToOutput" AfterTargets="Build">
-    <Copy SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-  </Target>
+  <ItemGroup>
+    <None PackagePath="\" Include="icon-small.png" Pack="true" />
+  </ItemGroup>
 </Project>

@@ -31,6 +31,7 @@
 - Keep the managed `bindings/dotnet/Rheo.Storage` package ergonomic and modern without forcing .NET object-shape concerns back into `rheo_storage`.
 - Support async workflows, progress reporting, explicit watching, and streamed writes through pull-based native handles rather than native-to-managed callbacks.
 - Keep long-lived handle management and .NET-friendly orchestration in the managed wrapper instead of pushing .NET lifecycle rules into `rheo_storage`.
+- Keep shared .NET package metadata and workflow settings in `rheo.config.toml`, then synchronize consumer projects through `rheo_repo_tool`.
 
 ## Builder Scope
 - `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
@@ -52,12 +53,14 @@
 - Prefer same-volume rename moves for the fast path, and only fall back to copy/delete when a cross-volume move requires it.
 - Prefer Windows as the authoritative CI and release platform for this repo unless a specific portability goal justifies another runner.
 - If a workflow or test depends on large binary assets tracked with Git LFS, explicitly enable LFS checkout in CI instead of assuming the files arrive as normal Git blobs.
+- Split CI lanes by purpose: pull requests validate code health, `main` verifies package consumption, and publishing stays manual behind environment-scoped secrets.
 
 ## Documentation Split
 - Use rustdoc comments for public Rust items.
 - Use `docs/` for AI guidance, ADRs, and migration notes.
 - Avoid duplicating the same guidance in both places.
 - Keep release workflow knowledge in the repo root and `docs/ai` rather than only in GitHub Actions YAML, so future agents understand why the pipeline is shaped the way it is.
+- Keep repo tooling usage documented near the workflows so version bumps and secret handling do not become tribal knowledge.
 
 ## Testing Expectations
 - Prefer small, deterministic fixtures.

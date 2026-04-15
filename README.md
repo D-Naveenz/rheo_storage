@@ -48,14 +48,18 @@ APIs, definition-driven file analysis, and Windows-first integration.
 
 ## Release Flow
 
-- Workspace releases are configured through [`cargo release`](https://github.com/crate-ci/cargo-release).
-- Root [release.toml](./release.toml) keeps the workspace on a shared version and creates tags in the form `v<version>`.
-- GitHub Actions release automation lives in [release.yml](./.github/workflows/release.yml).
-- The release workflow is manual by design:
-  - run it with `execute = false` for a dry run
-  - run it with `execute = true` to publish, tag, and push
-- Executed releases require a `CARGO_REGISTRY_TOKEN` repository secret for crates.io publishing.
+- Shared release metadata lives in [rheo.config.toml](./rheo.config.toml).
+- Local developer secrets belong in `.env.local`, created from [.env.example](./.env.example).
+- [`rheo_repo_tool`](./rheo_repo_tool) owns config sync, version edits, env bootstrapping, and release verification.
+- GitHub Actions delivery lanes are split by responsibility:
+  - [ci.yml](./.github/workflows/ci.yml): pull request validation only
+  - [package-verify.yml](./.github/workflows/package-verify.yml): build and verify a consumable NuGet package on `main`
+  - [publish-nuget.yml](./.github/workflows/publish-nuget.yml): manual NuGet publish with consumer-side verification
+  - [release-rust.yml](./.github/workflows/release-rust.yml): manual crates.io workspace release
+- Root [release.toml](./release.toml) still configures shared Rust crate releases and tags in the form `v<version>`.
+- See [releasing-rheo-storage-dotnet.md](./docs/reference/releasing-rheo-storage-dotnet.md) for the .NET package flow.
 
 ## Consumer Docs
 - [Rust consumer](./docs/reference/rust-consumer.md)
 - [.NET consumer](./docs/reference/dotnet-consumer.md)
+- [.NET release operations](./docs/reference/releasing-rheo-storage-dotnet.md)

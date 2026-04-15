@@ -2,12 +2,10 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 env:
   CARGO_TERM_COLOR: always
+  DOTNET_CLI_HOME: ${{ github.workspace }}\.dotnet
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -29,10 +27,16 @@ jobs:
           toolchain: stable
           components: rustfmt
 
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
       - name: Check formatting
         run: |
           cargo fmt -p rheo_storage --check
           cargo fmt -p rheo_storage_ffi --check
+          cargo fmt -p rheo_repo_tool --check
           cargo fmt -p rheo_storage_def_builder --check
 
       - name: Cache Cargo dependencies
@@ -56,10 +60,16 @@ jobs:
           toolchain: stable
           components: clippy
 
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
       - name: Run clippy for Rheo crates
         run: |
           cargo clippy -p rheo_storage --all-targets --all-features -- -D warnings
           cargo clippy -p rheo_storage_ffi --all-targets -- -D warnings
+          cargo clippy -p rheo_repo_tool --all-targets -- -D warnings
           cargo clippy -p rheo_storage_def_builder --all-targets -- -D warnings
 
       - name: Cache Cargo dependencies
@@ -79,10 +89,17 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
       - name: Run Rheo tests
         run: |
+          cargo run -p rheo_repo_tool -- verify release
           cargo test -p rheo_storage --all-features
           cargo test -p rheo_storage_ffi
+          cargo test -p rheo_repo_tool
           cargo test -p rheo_storage_def_builder
           dotnet test bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
 
@@ -101,10 +118,16 @@ jobs:
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
 
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
       - name: Build docs for Rheo crates
         run: |
           cargo doc -p rheo_storage --no-deps --all-features
           cargo doc -p rheo_storage_ffi --no-deps
+          cargo doc -p rheo_repo_tool --no-deps
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
