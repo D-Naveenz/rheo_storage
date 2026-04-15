@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/bindings/" />
+  <Folder Name="/bindings/dotnet/">
+    <Project Path="bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj" />
+    <Project Path="bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj" />
+  </Folder>
+</Solution>
