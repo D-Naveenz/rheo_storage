@@ -29,7 +29,8 @@
 - Keep the FFI surface path-based and UTF-8 oriented instead of mirroring Rust handle types.
 - Keep rich FFI payloads JSON-based unless a clear performance bottleneck justifies lower-level ABI structs.
 - Keep the managed `bindings/dotnet/Rheo.Storage` package ergonomic and modern without forcing .NET object-shape concerns back into `rheo_storage`.
-- Leave watchers, async exports, and progress callbacks out of the initial .NET wrapper until the core synchronous surface is stable.
+- Support async workflows, progress reporting, explicit watching, and streamed writes through pull-based native handles rather than native-to-managed callbacks.
+- Keep long-lived handle management and .NET-friendly orchestration in the managed wrapper instead of pushing .NET lifecycle rules into `rheo_storage`.
 
 ## Builder Scope
 - `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.

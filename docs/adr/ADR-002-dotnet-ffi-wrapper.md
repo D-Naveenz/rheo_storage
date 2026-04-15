@@ -18,18 +18,21 @@ constraints that are not a good fit for the target NuGet audience.
 - Expose the Rust runtime to .NET through a dedicated `rheo_storage_ffi` crate
   that publishes a Windows-first C ABI.
 - Keep the native ABI path-based and UTF-8 oriented.
-- Return rich data to .NET as JSON payloads in v1 and raw file reads as byte
-  buffers with explicit free functions.
+- Return rich data to .NET as JSON payloads, raw file reads as byte buffers with
+  explicit free functions, and stream uploads through explicit write-session
+  handles.
 - Keep the ergonomic public .NET API in a managed wrapper project under
   `bindings/dotnet/Rheo.Storage`.
-- Keep watchers, async exports, and progress callbacks out of the initial FFI
-  surface.
+- Support async workflows through pull-based native operation handles rather
+  than native-to-managed callbacks.
+- Support explicit directory watching through pull-based native watch handles.
 
 ## Consequences
 - `rheo_storage` remains Rust-native and free of WinRT-specific type shaping.
 - The managed package can target normal desktop .NET consumers without packaged
   app requirements.
 - The ABI stays small and explicit, which makes testing, packaging, and
-  exception mapping easier.
+  exception mapping easier while still supporting async, progress, and watcher
+  features from managed code.
 - Future interop work can add lower-level ABI structs or callback contracts only
   where a concrete need justifies the extra complexity.

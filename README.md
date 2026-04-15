@@ -20,8 +20,8 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - Uses the bundled `filedefs.rpkg` runtime package and reads filedefs payloads through `rheo_rpkg`.
 
 ### `rheo_storage_ffi`
-- Thin native interop layer over `rheo_storage`.
-- Exposes a stable path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, and raw byte buffers for file reads.
+- Native interop layer over `rheo_storage`.
+- Exposes a path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, operation handles for async/progress workflows, watch handles for directory monitoring, and write sessions for streamed uploads.
 
 ### `rheo_storage_def_builder`
 - CLI application for building and inspecting Rheo definitions packages from TrID XML sources.

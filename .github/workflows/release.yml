@@ -59,7 +59,7 @@ jobs:
           cargo test -p rheo_storage --all-features
           cargo test -p rheo_storage_ffi
           cargo test -p rheo_storage_def_builder
-          dotnet run --configuration Release --project bindings/dotnet/Rheo.Storage.TestHost/Rheo.Storage.TestHost.csproj
+          dotnet test --configuration Release bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
 
       - name: Dry run workspace release
         if: ${{ !inputs.execute }}
