@@ -65,7 +65,9 @@ internal sealed class NativeOperationHandle : IDisposable
         var status = NativeOperations.rheo_operation_get_error(_handle, out var jsonPtr, out var jsonLen, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
         var json = NativeMemory.ReadUtf8AndFree(jsonPtr, jsonLen);
-        return string.IsNullOrWhiteSpace(json) ? null : NativeJson.Deserialize<NativeErrorPayload?>(json);
+        return string.IsNullOrWhiteSpace(json) || string.Equals(json, "null", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : NativeJson.Deserialize<NativeErrorPayload>(json);
     }
 
     internal async Task<StorageProgress> WaitForCompletionAsync(

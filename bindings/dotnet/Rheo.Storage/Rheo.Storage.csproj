@@ -6,6 +6,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
     <PackageId>Rheo.Storage</PackageId>
     <Description>High-level .NET bindings for the native Rheo Storage Rust runtime.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>

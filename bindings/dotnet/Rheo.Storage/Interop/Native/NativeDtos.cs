@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace Rheo.Storage.Interop.Native;
 
 internal sealed record NativeErrorPayload(
@@ -26,12 +24,12 @@ internal sealed record NativeStorageMetadataDto(
 internal sealed record NativeDetectedDefinitionDto(
     string FileTypeLabel,
     string MimeType,
-    IReadOnlyList<string> Extensions,
+    string[] Extensions,
     ulong Score,
     double Confidence);
 
 internal sealed record NativeAnalysisReportDto(
-    IReadOnlyList<NativeDetectedDefinitionDto> Matches,
+    NativeDetectedDefinitionDto[] Matches,
     string? TopMimeType,
     string? TopDetectedExtension,
     string ContentKind,
