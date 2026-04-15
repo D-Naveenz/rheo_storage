@@ -1,16 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>Rheo.Storage</PackageId>
-    <Description>.NET wrapper over the native Rheo Storage Rust runtime.</Description>
+    <Description>High-level .NET bindings for the native Rheo Storage Rust runtime.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/D-Naveenz/rheo_storage</RepositoryUrl>
     <Authors>Naveen Dharmathunga</Authors>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageTags>storage;ffi;rust;analysis;file-handling;directory-management;watching</PackageTags>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))\</RepoRoot>
     <NativeConfiguration Condition="'$(Configuration)' == 'Release'">release</NativeConfiguration>
     <NativeConfiguration Condition="'$(NativeConfiguration)' == ''">debug</NativeConfiguration>
