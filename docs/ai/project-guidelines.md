@@ -31,7 +31,7 @@
 - Keep the managed `bindings/dotnet/Rheo.Storage` package ergonomic and modern without forcing .NET object-shape concerns back into `rheo_storage`.
 - Support async workflows, progress reporting, explicit watching, and streamed writes through pull-based native handles rather than native-to-managed callbacks.
 - Keep long-lived handle management and .NET-friendly orchestration in the managed wrapper instead of pushing .NET lifecycle rules into `rheo_storage`.
-- Keep shared .NET package metadata and workflow settings in `rheo.config.toml`, then synchronize consumer projects through `rheo_repo_tool`.
+- Keep shared .NET package metadata, runtime matrices, and workflow settings in `rheo.config.toml`, then drive synchronization and verification through `rheo_tool`.
 
 ## Builder Scope
 - `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
@@ -39,8 +39,8 @@
 - Preserve the logical `filedefs.rpkg` runtime contract even if the on-disk encoding changes, but keep generic package/container code in a shared crate instead of inside `rheo_storage`.
 - Keep MIME validation offline and deterministic by vendoring a normalized IANA snapshot plus custom overlay types into the repo.
 - Keep builder output deterministic even when source archives contain inconsistent XML such as repeated optional nodes.
-- Keep the builder as a CLI application, not a reusable public library crate. Public API belongs in `rheo_storage`.
-- Treat the interactive TUI and one-shot CLI as two front ends over one shared command runner instead of separate execution paths.
+- Keep the builder logic reusable inside repo-owned tooling, but do not treat it as a stable external library surface. Public runtime API still belongs in `rheo_storage`.
+- Treat the interactive shell and one-shot CLI as two front ends over one shared command runner instead of separate execution paths.
 
 ## ABI Layer Rules
 - Keep ABI crates thin over the core runtime.
@@ -54,6 +54,7 @@
 - Prefer Windows as the authoritative CI and release platform for this repo unless a specific portability goal justifies another runner.
 - If a workflow or test depends on large binary assets tracked with Git LFS, explicitly enable LFS checkout in CI instead of assuming the files arrive as normal Git blobs.
 - Split CI lanes by purpose: pull requests validate code health, `main` verifies package consumption, and publishing stays manual behind environment-scoped secrets.
+- Keep GitHub Actions thin whenever possible: the operational logic for verification, packaging, and release should live in `rheo_tool`, with workflows acting as wrappers that provide runners, toolchains, caches, and secrets.
 
 ## Documentation Split
 - Use rustdoc comments for public Rust items.

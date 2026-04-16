@@ -1,8 +1,8 @@
 use std::ffi::c_char;
 use std::fs::{self, OpenOptions};
 use std::ptr;
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 
 use crate::abi::{NativeWriteSession, RheoStatus, with_write_session};
 use crate::errors::FfiFailure;
@@ -36,13 +36,12 @@ pub unsafe extern "C" fn rheo_write_session_create(
 
         let result = (|| {
             let path = parse_path_arg(path, "path")?;
-            if create_parent_directories != 0 {
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        fs::create_dir_all(parent)
-                            .map_err(|err| FfiFailure::io("create parent directory for", parent, err))?;
-                    }
-                }
+            if create_parent_directories != 0
+                && let Some(parent) = path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                fs::create_dir_all(parent)
+                    .map_err(|err| FfiFailure::io("create parent directory for", parent, err))?;
             }
 
             let mut options = OpenOptions::new();

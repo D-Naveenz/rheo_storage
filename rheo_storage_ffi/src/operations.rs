@@ -396,9 +396,12 @@ pub unsafe extern "C" fn rheo_operation_start_delete_directory(
         || {
             let path = parse_path_arg(path, "path")?;
             Ok(spawn_path_operation(move |handle| {
-                delete_directory_with_options(&path, crate::abi::delete_options(&handle, recursive != 0))
-                    .map(|_| crate::abi::OperationResult::None)
-                    .map_err(FfiFailure::from)
+                delete_directory_with_options(
+                    &path,
+                    crate::abi::delete_options(&handle, recursive != 0),
+                )
+                .map(|_| crate::abi::OperationResult::None)
+                .map_err(FfiFailure::from)
             }))
         }
     ))
@@ -527,9 +530,9 @@ pub unsafe extern "C" fn rheo_operation_free(handle: *mut NativeOperationHandle)
 
     let handle = Arc::from_raw(handle);
     handle.cancellation_token.cancel();
-    if let Ok(mut slot) = handle.worker.lock() {
-        if let Some(worker) = slot.take() {
-            let _ = worker.join();
-        }
+    if let Ok(mut slot) = handle.worker.lock()
+        && let Some(worker) = slot.take()
+    {
+        let _ = worker.join();
     }
 }

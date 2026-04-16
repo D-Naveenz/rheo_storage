@@ -269,21 +269,23 @@ pub(crate) fn fail_if_cancelled(handle: &Arc<NativeOperationHandle>) -> Result<(
 
 pub(crate) fn spawn_path_operation(
     operation: impl FnOnce(Arc<NativeOperationHandle>) -> Result<OperationResult, FfiFailure>
-        + Send
-        + 'static,
+    + Send
+    + 'static,
 ) -> *mut NativeOperationHandle {
     spawn_operation(operation)
 }
 
 pub(crate) fn spawn_operation(
     operation: impl FnOnce(Arc<NativeOperationHandle>) -> Result<OperationResult, FfiFailure>
-        + Send
-        + 'static,
+    + Send
+    + 'static,
 ) -> *mut NativeOperationHandle {
     let handle = NativeOperationHandle::new();
     let worker_state = handle.clone();
-    let join = thread::spawn(
-        move || match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(worker_state.clone()))) {
+    let join = thread::spawn(move || {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            operation(worker_state.clone())
+        })) {
             Ok(Ok(result)) => worker_state.set_completed(result),
             Ok(Err(failure)) => worker_state.set_failure(failure),
             Err(_) => worker_state.set_failure(FfiFailure {
@@ -297,8 +299,8 @@ pub(crate) fn spawn_operation(
                     value: None,
                 },
             }),
-        },
-    );
+        }
+    });
 
     if let Ok(mut slot) = handle.worker.lock() {
         *slot = Some(join);

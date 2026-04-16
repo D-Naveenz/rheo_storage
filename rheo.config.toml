@@ -25,5 +25,14 @@ project_url = "https://github.com/D-Naveenz/rheo_storage"
 smoke_project = "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj"
 package_project = "bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj"
 tests_project = "bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"
+native_runtimes = ["win-x64", "win-arm64"]
+host_runtime_smoke = "win-x64"
+aot_runtime_smoke = "win-x64"
+
+[publish]
 environment = "nuget-production"
-runtime = "win-x64"
+api_key_env = "NUGET_API_KEY"
+
+[targets.rust_targets]
+win-x64 = "x86_64-pc-windows-msvc"
+win-arm64 = "aarch64-pc-windows-msvc"

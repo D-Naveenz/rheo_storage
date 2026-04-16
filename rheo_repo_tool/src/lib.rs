@@ -20,6 +20,8 @@ pub struct RepoConfig {
     pub versions: VersionConfig,
     pub nuget: NuGetConfig,
     pub ci: CiConfig,
+    pub publish: PublishConfig,
+    pub targets: TargetsConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,8 +49,20 @@ pub struct CiConfig {
     pub smoke_project: String,
     pub package_project: String,
     pub tests_project: String,
+    pub native_runtimes: Vec<String>,
+    pub host_runtime_smoke: String,
+    pub aot_runtime_smoke: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PublishConfig {
     pub environment: String,
-    pub runtime: String,
+    pub api_key_env: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TargetsConfig {
+    pub rust_targets: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -297,6 +311,40 @@ pub fn validate_config(repo_root: &Path, config: &RepoConfig) -> Result<()> {
     if config.nuget.tags.is_empty() {
         bail!("nuget.tags must not be empty");
     }
+    if config.ci.native_runtimes.is_empty() {
+        bail!("ci.native_runtimes must not be empty");
+    }
+    if config.publish.environment.trim().is_empty() {
+        bail!("publish.environment must not be empty");
+    }
+    if config.publish.api_key_env.trim().is_empty() {
+        bail!("publish.api_key_env must not be empty");
+    }
+    for runtime in &config.ci.native_runtimes {
+        if !config.targets.rust_targets.contains_key(runtime) {
+            bail!("targets.rust_targets is missing an entry for runtime '{runtime}'");
+        }
+    }
+    if !config
+        .ci
+        .native_runtimes
+        .contains(&config.ci.host_runtime_smoke)
+    {
+        bail!(
+            "ci.host_runtime_smoke '{}' must be present in ci.native_runtimes",
+            config.ci.host_runtime_smoke
+        );
+    }
+    if !config
+        .ci
+        .native_runtimes
+        .contains(&config.ci.aot_runtime_smoke)
+    {
+        bail!(
+            "ci.aot_runtime_smoke '{}' must be present in ci.native_runtimes",
+            config.ci.aot_runtime_smoke
+        );
+    }
 
     require_exists(repo_root, CONFIG_PATH)?;
     require_exists(repo_root, ROOT_CARGO_TOML_PATH)?;
@@ -448,8 +496,19 @@ mod tests {
                 package_project: "bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj".to_owned(),
                 tests_project: "bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"
                     .to_owned(),
+                native_runtimes: vec!["win-x64".to_owned(), "win-arm64".to_owned()],
+                host_runtime_smoke: "win-x64".to_owned(),
+                aot_runtime_smoke: "win-x64".to_owned(),
+            },
+            publish: PublishConfig {
                 environment: "nuget-production".to_owned(),
-                runtime: "win-x64".to_owned(),
+                api_key_env: "NUGET_API_KEY".to_owned(),
+            },
+            targets: TargetsConfig {
+                rust_targets: BTreeMap::from([
+                    ("win-x64".to_owned(), "x86_64-pc-windows-msvc".to_owned()),
+                    ("win-arm64".to_owned(), "aarch64-pc-windows-msvc".to_owned()),
+                ]),
             },
         }
     }

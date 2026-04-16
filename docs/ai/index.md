@@ -14,5 +14,6 @@
 ## Current Focus
 - Keep `rheo_storage` as the source of truth for analysis, metadata, operations, enumeration, and watching.
 - Keep ABI concerns isolated in `rheo_storage_ffi` and the managed `bindings/dotnet/Rheo.Storage` wrapper.
-- Use `rheo_storage_def_builder` to inspect, normalize, build, and validate the runtime package format.
+- Use `rheo_tool` as the operator surface for defs, verification, package validation, and release workflows.
+- Use the defs engine behind `rheo_tool defs` to inspect, normalize, build, and validate the runtime package format.
 - Treat release automation and CI as part of project memory: Windows-only pipelines and Git LFS-aware checkout are intentional repo rules, not incidental implementation details.

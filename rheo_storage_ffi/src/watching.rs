@@ -126,7 +126,10 @@ pub unsafe extern "C" fn rheo_watch_stop(
 ) -> RheoStatus {
     ffi_fn!(execute_unit(out_error_ptr, out_error_len, || {
         with_watch_handle(handle, |watch_handle| {
-            let mut slot = watch_handle.handle.lock().unwrap_or_else(|p| p.into_inner());
+            let mut slot = watch_handle
+                .handle
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
             slot.take();
             Ok(())
         })
@@ -162,7 +165,10 @@ unsafe fn execute_watch_receive(
         out_error_len,
         || {
             with_watch_handle(handle, |watch_handle| {
-                let slot = watch_handle.handle.lock().unwrap_or_else(|p| p.into_inner());
+                let slot = watch_handle
+                    .handle
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner());
                 let watch = slot
                     .as_ref()
                     .ok_or_else(|| FfiFailure::error("watch handle has already been stopped"))?;

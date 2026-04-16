@@ -188,10 +188,7 @@ fn copy_directory_recursive(
     for entry in fs::read_dir(source)
         .map_err(|err| StorageError::io("read directory for copy", source, err))?
     {
-        super::common::ensure_not_cancelled(
-            options.cancellation_token.as_ref(),
-            "copy directory",
-        )?;
+        super::common::ensure_not_cancelled(options.cancellation_token.as_ref(), "copy directory")?;
         let entry = entry
             .map_err(|err| StorageError::io("enumerate directory entries for copy", source, err))?;
         let file_type = entry
@@ -324,9 +321,8 @@ fn delete_directory_recursive(
         .map_err(|err| StorageError::io("read directory for delete", path, err))?
     {
         super::common::ensure_not_cancelled(cancellation_token, "delete directory")?;
-        let entry = entry.map_err(|err| {
-            StorageError::io("enumerate directory entries for delete", path, err)
-        })?;
+        let entry = entry
+            .map_err(|err| StorageError::io("enumerate directory entries for delete", path, err))?;
         let entry_path = entry.path();
         let file_type = entry
             .file_type()
@@ -335,8 +331,9 @@ fn delete_directory_recursive(
         if file_type.is_dir() {
             delete_directory_recursive(&entry_path, cancellation_token)?;
         } else {
-            fs::remove_file(&entry_path)
-                .map_err(|err| StorageError::io("delete file during directory delete", &entry_path, err))?;
+            fs::remove_file(&entry_path).map_err(|err| {
+                StorageError::io("delete file during directory delete", &entry_path, err)
+            })?;
         }
     }
 

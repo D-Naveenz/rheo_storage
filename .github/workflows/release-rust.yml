@@ -56,10 +56,11 @@ jobs:
 
       - name: Validate workspace before release
         run: |
-          cargo run -p rheo_repo_tool -- verify release
+          cargo run -p rheo_tool -- verify release-config
           cargo test -p rheo_storage --all-features
           cargo test -p rheo_storage_ffi
           cargo test -p rheo_repo_tool
+          cargo test -p rheo_tool
           cargo test -p rheo_storage_def_builder
           dotnet test --configuration Release bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
 

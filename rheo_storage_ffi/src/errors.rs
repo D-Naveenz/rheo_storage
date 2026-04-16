@@ -2,8 +2,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::models::path_to_string;
 use crate::abi::RheoStatus;
+use crate::models::path_to_string;
 use rheo_storage::StorageError;
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,11 +38,7 @@ impl FfiFailure {
         }
     }
 
-    pub(crate) fn io(
-        operation: &'static str,
-        path: &Path,
-        source: std::io::Error,
-    ) -> Self {
+    pub(crate) fn io(operation: &'static str, path: &Path, source: std::io::Error) -> Self {
         Self {
             status: RheoStatus::Error,
             payload: ErrorPayload {

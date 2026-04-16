@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fmt:
-    name: fmt
+  verify:
+    name: verify ci (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -25,89 +25,21 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          components: rustfmt
+          components: rustfmt, clippy
 
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
-      - name: Check formatting
-        run: |
-          cargo fmt -p rheo_storage --check
-          cargo fmt -p rheo_storage_ffi --check
-          cargo fmt -p rheo_repo_tool --check
-          cargo fmt -p rheo_storage_def_builder --check
-
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
-  clippy:
-    name: clippy (windows)
-    runs-on: windows-latest
-    permissions:
-      contents: read
-      checks: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          lfs: true
+      - name: Verify CI
+        run: cargo run -p rheo_tool -- verify ci
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: clippy
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Run clippy for Rheo crates
-        run: |
-          cargo clippy -p rheo_storage --all-targets --all-features -- -D warnings
-          cargo clippy -p rheo_storage_ffi --all-targets -- -D warnings
-          cargo clippy -p rheo_repo_tool --all-targets -- -D warnings
-          cargo clippy -p rheo_storage_def_builder --all-targets -- -D warnings
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-  test:
-    name: test (windows)
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          lfs: true
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Run Rheo tests
-        run: |
-          cargo run -p rheo_repo_tool -- verify release
-          cargo test -p rheo_storage --all-features
-          cargo test -p rheo_storage_ffi
-          cargo test -p rheo_repo_tool
-          cargo test -p rheo_storage_def_builder
-          dotnet test bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-
-  doc:
-    name: doc (windows)
+  docs:
+    name: verify docs (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -123,11 +55,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Build docs for Rheo crates
-        run: |
-          cargo doc -p rheo_storage --no-deps --all-features
-          cargo doc -p rheo_storage_ffi --no-deps
-          cargo doc -p rheo_repo_tool --no-deps
-
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Build docs for Rheo crates
+        run: cargo run -p rheo_tool -- verify docs

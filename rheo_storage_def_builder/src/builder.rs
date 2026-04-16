@@ -16,12 +16,12 @@ use tracing::{debug, info};
 #[path = "trid_xml/mod.rs"]
 mod trid_xml;
 
-pub(crate) use trid_xml::{
+pub use trid_xml::{
     TridBuildProgress, TridBuildStage, TridTransformReport, build_trid_xml_package_with_progress,
 };
 
 #[derive(Debug, Error)]
-pub(crate) enum BuilderError {
+pub enum BuilderError {
     #[error("failed to {operation} '{path}': {source}")]
     Io {
         operation: &'static str,
@@ -57,7 +57,7 @@ pub(crate) enum BuilderError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PackageSummary {
+pub struct PackageSummary {
     pub(crate) package_id: String,
     pub(crate) purpose: PackagePurpose,
     pub(crate) compression: CompressionKind,
@@ -88,7 +88,7 @@ impl PackageSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LoadedPackage {
+pub struct LoadedPackage {
     pub(crate) package: DefinitionPackage,
     pub(crate) package_id: [u8; 4],
     pub(crate) purpose: PackagePurpose,
@@ -105,7 +105,7 @@ impl LoadedPackage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum SyncEmbeddedStatus {
+pub enum SyncEmbeddedStatus {
     Skipped,
     UpToDate,
     Updated,
@@ -113,7 +113,7 @@ pub(crate) enum SyncEmbeddedStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SyncEmbeddedOutcome {
+pub struct SyncEmbeddedOutcome {
     pub(crate) input: PathBuf,
     pub(crate) output: PathBuf,
     pub(crate) status: SyncEmbeddedStatus,
@@ -122,7 +122,7 @@ pub(crate) struct SyncEmbeddedOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct FiledefsPackageMetadata {
+pub struct FiledefsPackageMetadata {
     package_version: String,
     source_version: String,
     package_revision: u16,
@@ -131,7 +131,7 @@ pub(crate) struct FiledefsPackageMetadata {
 #[derive(Debug, Serialize)]
 struct RawPackageOut(String, String, u16, (), u32, Vec<DefinitionRecord>);
 
-pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, BuilderError> {
+pub fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, BuilderError> {
     let path = path.as_ref();
     info!(path = %path.display(), "loading definitions package");
     let bytes = fs::read(path).map_err(|source| BuilderError::Io {
@@ -197,7 +197,7 @@ pub(crate) fn load_package(path: impl AsRef<Path>) -> Result<LoadedPackage, Buil
     })
 }
 
-pub(crate) fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
+pub fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> {
     info!("loading bundled runtime definitions package");
     bundled_definition_package()
         .cloned()
@@ -206,14 +206,14 @@ pub(crate) fn load_bundled_package() -> Result<DefinitionPackage, BuilderError> 
         })
 }
 
-pub(crate) fn write_package(
+pub fn write_package(
     package: &DefinitionPackage,
     path: impl AsRef<Path>,
 ) -> Result<PathBuf, BuilderError> {
     write_package_with_purpose(package, path, PackagePurpose::Standard)
 }
 
-pub(crate) fn write_package_with_purpose(
+pub fn write_package_with_purpose(
     package: &DefinitionPackage,
     path: impl AsRef<Path>,
     purpose: PackagePurpose,
@@ -258,7 +258,7 @@ pub(crate) fn write_package_with_purpose(
     Ok(path)
 }
 
-pub(crate) fn normalize_package(
+pub fn normalize_package(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
 ) -> Result<PathBuf, BuilderError> {
@@ -267,7 +267,7 @@ pub(crate) fn normalize_package(
     write_package_with_purpose(&package.package, output, package.purpose)
 }
 
-pub(crate) fn packages_match(
+pub fn packages_match(
     left: impl AsRef<Path>,
     right: impl AsRef<Path>,
 ) -> Result<bool, BuilderError> {
@@ -282,13 +282,13 @@ pub(crate) fn packages_match(
         && left.metadata == right.metadata)
 }
 
-pub(crate) fn inspect_package(path: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
+pub fn inspect_package(path: impl AsRef<Path>) -> Result<PackageSummary, BuilderError> {
     info!("inspecting definitions package");
     let package = load_package(path)?;
     Ok(PackageSummary::from_loaded(&package))
 }
 
-pub(crate) fn sync_embedded_package(
+pub fn sync_embedded_package(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
     check_only: bool,

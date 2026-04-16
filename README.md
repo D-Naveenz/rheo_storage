@@ -7,7 +7,8 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - `rheo_rpkg`: generic MessagePack-based `RPKG` v2 container crate
 - `rheo_storage`: core runtime library
 - `rheo_storage_ffi`: native C ABI wrapper crate for .NET and other FFI consumers
-- `rheo_storage_def_builder`: definitions package builder, validator, and normalization tool
+- `rheo_storage_def_builder`: definitions package engine that powers repo tooling workflows
+- `rheo_tool`: umbrella operator CLI for definitions, verification, packaging, and release flows
 
 ## Crates
 
@@ -24,20 +25,24 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - Exposes a path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, operation handles for async/progress workflows, watch handles for directory monitoring, and write sessions for streamed uploads.
 
 ### `rheo_storage_def_builder`
-- CLI application for building and inspecting Rheo definitions packages from TrID XML sources.
-- Supports both interactive TUI usage and one-shot command execution.
-- Owns filedefs package serialization plus embedded package refresh through `sync-embedded`.
+- Internal builder engine for TrID ingestion, package serialization, normalization, and embedded package refresh.
+- Shared by repo-facing tooling so definition workflows stay in one implementation path.
+
+### `rheo_tool`
+- Primary operator CLI for this repository.
+- Owns `defs`, `verify`, `package`, `release`, `config`, and `version` command groups.
+- Supports direct commands for automation and an interactive shell when launched without a subcommand in a real terminal.
 
 ## Builder Package Assets
 - `rheo_storage_def_builder/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
 - That folder is excluded from Cargo package publishing, but `rheo_storage_def_builder` copies it into the active Cargo output directory during build.
 - The copy target mirrors MSBuild-style output behavior, so after building you can expect `target/debug/package` or `target/release/package` beside the builder executable.
-- The builder now uses executable-relative defaults:
+- The shared defs workflow now uses executable-relative defaults:
   - `package/` for TrID source discovery
   - `output/` for generated `filedefs.rpkg`
   - `logs/` for dated log files such as `2026-04-10_def_builder.log`
-- All three locations can still be overridden from the CLI with `--package-dir`, `--output-dir`, and `--logs-dir`, or by passing explicit `--input` and `--output` paths on commands that support them.
-- Launching `rheo_storage_def_builder` without a subcommand in a real terminal now opens the interactive Rheo shell.
+- All three locations can still be overridden from `rheo_tool` with `--package-dir`, `--output-dir`, and `--logs-dir`, or by passing explicit `--input` and `--output` paths on commands that support them.
+- Launching `rheo_tool` without a subcommand in a real terminal opens the interactive Rheo shell.
 - Explicit subcommands still run directly, so scripting and automation remain compatible.
 
 ## Release Metadata
@@ -50,7 +55,7 @@ APIs, definition-driven file analysis, and Windows-first integration.
 
 - Shared release metadata lives in [rheo.config.toml](./rheo.config.toml).
 - Local developer secrets belong in `.env.local`, created from [.env.example](./.env.example).
-- [`rheo_repo_tool`](./rheo_repo_tool) owns config sync, version edits, env bootstrapping, and release verification.
+- [`rheo_tool`](./rheo_tool) is the supported operator surface for config sync, version edits, env bootstrapping, verification, package validation, and publish flows.
 - GitHub Actions delivery lanes are split by responsibility:
   - [ci.yml](./.github/workflows/ci.yml): pull request validation only
   - [package-verify.yml](./.github/workflows/package-verify.yml): build and verify a consumable NuGet package on `main`

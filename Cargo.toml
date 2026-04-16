@@ -5,6 +5,7 @@ members = [
     "rheo_storage",
     "rheo_storage_ffi",
     "rheo_storage_def_builder",
+    "rheo_tool",
 ]
 resolver = "3"
 

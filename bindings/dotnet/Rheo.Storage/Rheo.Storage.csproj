@@ -18,18 +18,22 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageTags>storage;ffi;rust;analysis;file-handling;directory-management;watching</PackageTags>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))\</RepoRoot>
+    <StagedNativeRoot Condition="'$(StagedNativeRoot)' == ''"></StagedNativeRoot>
     <NativeConfiguration Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">release</NativeConfiguration>
     <NativeConfiguration Condition="&apos;$(NativeConfiguration)&apos; == &apos;&apos;">debug</NativeConfiguration>
     <NativeCargoArgs Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">--release</NativeCargoArgs>
     <NativeDllPath>$(RepoRoot)target\$(NativeConfiguration)\rheo_storage_ffi.dll</NativeDllPath>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(StagedNativeRoot)' == ''">
     <None Include="$(NativeDllPath)" PackagePath="runtimes\win-x64\native" Visible="false" Pack="true" />
   </ItemGroup>
-  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild;Pack">
+  <ItemGroup Condition="'$(StagedNativeRoot)' != ''">
+    <None Include="$(StagedNativeRoot)\runtimes\**\native\*.dll" PackagePath="%(RecursiveDir)" Visible="false" Pack="true" />
+  </ItemGroup>
+  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild;Pack" Condition="'$(StagedNativeRoot)' == ''">
     <Exec WorkingDirectory="$(RepoRoot)" Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" />
   </Target>
-  <Target AfterTargets="Build" Name="CopyNativeLibraryToOutput">
+  <Target AfterTargets="Build" Name="CopyNativeLibraryToOutput" Condition="'$(StagedNativeRoot)' == ''">
     <Copy SkipUnchangedFiles="true" SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" />
   </Target>
   <ItemGroup>

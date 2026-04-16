@@ -167,11 +167,7 @@ pub(crate) unsafe fn reset_buffer_out(ptr_out: *mut *mut u8, len_out: *mut usize
     *len_out = 0;
 }
 
-pub(crate) unsafe fn write_buffer(
-    ptr_out: *mut *mut u8,
-    len_out: *mut usize,
-    bytes: Vec<u8>,
-) {
+pub(crate) unsafe fn write_buffer(ptr_out: *mut *mut u8, len_out: *mut usize, bytes: Vec<u8>) {
     let boxed = bytes.into_boxed_slice();
     let len = boxed.len();
     let ptr = Box::into_raw(boxed) as *mut u8;

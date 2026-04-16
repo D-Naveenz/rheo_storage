@@ -8,32 +8,33 @@ and package publication are treated as separate concerns.
 - Shared package metadata lives in [`rheo.config.toml`](../../rheo.config.toml).
 - Local developer secrets live in `.env.local`, created from
   [`.env.example`](../../.env.example).
-- [`rheo_repo_tool`](../../rheo_repo_tool) is the supported way to inspect and
-  synchronize repository configuration.
+- [`rheo_tool`](../../rheo_tool) is the supported way to inspect and
+  synchronize repository configuration, run CI-equivalent checks locally, and
+  drive NuGet verification and publishing.
 
 Useful commands:
 
 ```powershell
-cargo run -p rheo_repo_tool -- show
-cargo run -p rheo_repo_tool -- verify release
-cargo run -p rheo_repo_tool -- sync
-cargo run -p rheo_repo_tool -- version set --channel nuget 2.0.0
+cargo run -p rheo_tool -- config show
+cargo run -p rheo_tool -- verify release-config
+cargo run -p rheo_tool -- config sync
+cargo run -p rheo_tool -- version set --channel nuget 2.0.0
+cargo run -p rheo_tool -- verify ci
+cargo run -p rheo_tool -- verify package
 ```
 
 ## Workflow lanes
 
 - `ci.yml`
   - pull-request validation only
-  - runs formatting, clippy, Rust tests, repo-tool tests, and
-    `Rheo.Storage.Tests`
+  - runs the thin workflow wrapper around `cargo run -p rheo_tool -- verify ci`
 - `package-verify.yml`
   - runs on `main` and manual dispatch
-  - packs `Rheo.Storage`
-  - inspects the `.nupkg`
-  - restores and runs the committed smoke consumer from the produced package
-  - publishes and runs the same smoke consumer with Native AOT
+  - runs the thin workflow wrapper around `cargo run -p rheo_tool -- verify package`
+  - uploads the produced `.nupkg` and `.snupkg` artifacts
 - `publish-nuget.yml`
   - manual only
+  - drives `cargo run -p rheo_tool -- release publish`
   - repeats package verification
   - optionally overrides the NuGet version
   - publishes to nuget.org using the `nuget-production` environment secret
@@ -44,7 +45,7 @@ cargo run -p rheo_repo_tool -- version set --channel nuget 2.0.0
 - Rust crate versioning and NuGet package versioning are stored separately under
   `[versions]` in `rheo.config.toml`.
 - The first Rust-backed NuGet release is `2.0.0`.
-- After changing versions in the config, run `cargo run -p rheo_repo_tool -- sync`
+- After changing versions in the config, run `cargo run -p rheo_tool -- config sync`
   so `Cargo.toml` and `bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj` stay aligned.
 
 ## Secrets

@@ -11,19 +11,19 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Debug, Clone)]
-pub(crate) struct LoggingOptions {
-    pub(crate) silent: bool,
-    pub(crate) verbose: u8,
-    pub(crate) logs_dir: PathBuf,
-    pub(crate) interactive: bool,
+pub struct LoggingOptions {
+    pub silent: bool,
+    pub verbose: u8,
+    pub logs_dir: PathBuf,
+    pub interactive: bool,
 }
 
-pub(crate) struct LoggingRuntime {
-    pub(crate) log_path: PathBuf,
+pub struct LoggingRuntime {
+    pub log_path: PathBuf,
     _guard: WorkerGuard,
 }
 
-pub(crate) fn init_logging(options: LoggingOptions) -> Result<LoggingRuntime, std::io::Error> {
+pub fn init_logging(options: LoggingOptions) -> Result<LoggingRuntime, std::io::Error> {
     fs::create_dir_all(&options.logs_dir)?;
     let log_path = log_file_path(&options.logs_dir);
     let file = OpenOptions::new()
@@ -87,7 +87,7 @@ fn io_error_from_set_global_default(
     std::io::Error::other(error)
 }
 
-pub(crate) fn log_file_path(logs_dir: &Path) -> PathBuf {
+pub fn log_file_path(logs_dir: &Path) -> PathBuf {
     let today = Local::now().date_naive();
     logs_dir.join(dated_log_file_name_for(today))
 }

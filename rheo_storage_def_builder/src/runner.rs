@@ -6,7 +6,7 @@ use crate::builder::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum BuilderAction {
+pub enum BuilderAction {
     Pack {
         output: PathBuf,
     },
@@ -36,19 +36,19 @@ pub(crate) enum BuilderAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ReportStatus {
+pub enum ReportStatus {
     Success,
     Warning,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ReportField {
+pub struct ReportField {
     pub(crate) label: String,
     pub(crate) value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CommandReport {
+pub struct CommandReport {
     pub(crate) title: String,
     pub(crate) status: ReportStatus,
     pub(crate) fields: Vec<ReportField>,
@@ -56,7 +56,7 @@ pub(crate) struct CommandReport {
 }
 
 impl BuilderAction {
-    pub(crate) fn title(&self) -> &'static str {
+    pub fn title(&self) -> &'static str {
         match self {
             Self::Pack { .. } => "Bundled Package",
             Self::BuildTridXml { .. } => "Build Complete",
@@ -69,7 +69,37 @@ impl BuilderAction {
     }
 }
 
-pub(crate) fn execute_action<F>(
+impl ReportField {
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+impl CommandReport {
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    #[allow(dead_code)]
+    pub fn status(&self) -> &ReportStatus {
+        &self.status
+    }
+
+    pub fn fields(&self) -> &[ReportField] {
+        &self.fields
+    }
+
+    #[allow(dead_code)]
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code
+    }
+}
+
+pub fn execute_action<F>(
     action: BuilderAction,
     log_path: &Path,
     mut progress: F,
@@ -218,10 +248,10 @@ where
     }
 }
 
-pub(crate) fn print_report(report: &CommandReport) {
-    println!("{}", report.title);
-    for entry in &report.fields {
-        println!("{:<20} {}", entry.label, entry.value);
+pub fn print_report(report: &CommandReport) {
+    println!("{}", report.title());
+    for entry in report.fields() {
+        println!("{:<20} {}", entry.label(), entry.value());
     }
 }
 

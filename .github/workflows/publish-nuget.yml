@@ -41,6 +41,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Add Rust targets
+        run: rustup target add aarch64-pc-windows-msvc
+
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v5
         with:
@@ -49,170 +52,24 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Optionally set release version
-        if: ${{ inputs.version != '' }}
-        run: cargo run -p rheo_repo_tool -- version set --channel nuget ${{ inputs.version }}
-
-      - name: Sync repository configuration
-        run: |
-          cargo run -p rheo_repo_tool -- verify release
-          cargo run -p rheo_repo_tool -- sync
-
-      - name: Resolve package metadata
-        id: metadata
+      - name: Publish package
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          $config = Get-Content rheo.config.toml -Raw
-          $version = [regex]::Match($config, 'nuget_package\s*=\s*"([^"]+)"').Groups[1].Value
-          $runtime = [regex]::Match($config, 'runtime\s*=\s*"([^"]+)"').Groups[1].Value
-          $source = [regex]::Match($config, 'source\s*=\s*"([^"]+)"').Groups[1].Value
-          if (-not $version) { throw "Failed to resolve NuGet version from rheo.config.toml." }
-          if (-not $runtime) { throw "Failed to resolve runtime from rheo.config.toml." }
-          if (-not $source) { throw "Failed to resolve NuGet source from rheo.config.toml." }
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "runtime=$runtime" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "source=$source" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $arguments = @("run", "-p", "rheo_tool", "--", "release", "publish")
 
-      - name: Pack Rheo.Storage
-        run: |
-          dotnet pack bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj `
-            --configuration Release `
-            --include-symbols `
-            -p:ContinuousIntegrationBuild=true `
-            -p:Version=${{ steps.metadata.outputs.version }} `
-            --output ${{ github.workspace }}\artifacts\nuget
-
-      - name: Inspect package contents
-        shell: pwsh
-        run: |
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $package = Get-ChildItem $env:GITHUB_WORKSPACE\artifacts\nuget\Rheo.Storage.${{ steps.metadata.outputs.version }}.nupkg | Select-Object -First 1
-          if (-not $package) { throw "Package artifact not found." }
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
-          try {
-            $entries = $zip.Entries.FullName
-            if ($entries -notcontains 'lib/net10.0/Rheo.Storage.dll') {
-              throw "Managed assembly missing from package."
-            }
-            $nativeEntry = "runtimes/${{ steps.metadata.outputs.runtime }}/native/rheo_storage_ffi.dll"
-            if ($entries -notcontains $nativeEntry) {
-              throw "Native DLL missing from package."
-            }
-          }
-          finally {
-            $zip.Dispose()
+          if ($env:INPUT_VERSION) {
+            $arguments += @("--version", $env:INPUT_VERSION)
           }
 
-      - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: rheo-storage-publish-${{ steps.metadata.outputs.version }}
-          path: |
-            ${{ github.workspace }}\artifacts\nuget\*.nupkg
-            ${{ github.workspace }}\artifacts\nuget\*.snupkg
-
-      - name: Create local package NuGet.config
-        shell: pwsh
-        run: |
-          $configPath = Join-Path $env:GITHUB_WORKSPACE "artifacts\local-package.nuget.config"
-          $content = @"
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <add key="local" value="${env:GITHUB_WORKSPACE}\artifacts\nuget" />
-    <add key="nuget" value="https://api.nuget.org/v3/index.json" />
-  </packageSources>
-</configuration>
-"@
-          Set-Content -Path $configPath -Value $content -Encoding utf8
-
-      - name: Restore smoke consumer from local package source
-        run: |
-          dotnet restore bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj `
-            -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }} `
-            --configfile ${{ github.workspace }}\artifacts\local-package.nuget.config `
-            --force-evaluate
-
-      - name: Run smoke consumer
-        run: |
-          dotnet run --project bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj `
-            --configuration Release `
-            --no-restore `
-            -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }}
-
-      - name: Restore smoke consumer for Native AOT publish
-        run: |
-          dotnet restore bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj `
-            --runtime ${{ steps.metadata.outputs.runtime }} `
-            -p:PublishAot=true `
-            -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }} `
-            --configfile ${{ github.workspace }}\artifacts\local-package.nuget.config `
-            --force-evaluate
-
-      - name: Publish smoke consumer with Native AOT
-        run: |
-          dotnet publish bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj `
-            --configuration Release `
-            --runtime ${{ steps.metadata.outputs.runtime }} `
-            --self-contained true `
-            --no-restore `
-            -p:PublishAot=true `
-            -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }} `
-            --output ${{ github.workspace }}\artifacts\smoke-aot
-
-      - name: Run published Native AOT smoke app
-        shell: pwsh
-        run: |
-          & "${env:GITHUB_WORKSPACE}\artifacts\smoke-aot\Rheo.Storage.ConsumerSmoke.exe"
-
-      - name: Publish package to NuGet
-        if: ${{ !inputs.dry_run }}
-        run: |
-          dotnet nuget push ${{ github.workspace }}\artifacts\nuget\Rheo.Storage.${{ steps.metadata.outputs.version }}.nupkg `
-            --api-key "${{ secrets.NUGET_API_KEY }}" `
-            --source "${{ steps.metadata.outputs.source }}" `
-            --skip-duplicate
-
-      - name: Restore published package from NuGet.org
-        if: ${{ !inputs.dry_run }}
-        shell: pwsh
-        run: |
-          $packagesDir = Join-Path $env:RUNNER_TEMP "nuget-packages"
-          $smokeProject = "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj"
-          $configPath = Join-Path $env:GITHUB_WORKSPACE "artifacts\published-package.nuget.config"
-          $content = @"
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <add key="nuget" value="${{ steps.metadata.outputs.source }}" />
-  </packageSources>
-</configuration>
-"@
-          Set-Content -Path $configPath -Value $content -Encoding utf8
-          "NUGET_PACKAGES=$packagesDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          for ($attempt = 1; $attempt -le 6; $attempt++) {
-            Remove-Item -LiteralPath $packagesDir -Recurse -Force -ErrorAction SilentlyContinue
-            New-Item -ItemType Directory -Force -Path $packagesDir | Out-Null
-            $env:NUGET_PACKAGES = $packagesDir
-            dotnet restore $smokeProject `
-              -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }} `
-              --configfile $configPath `
-              --force-evaluate
-            if ($LASTEXITCODE -eq 0) {
-              exit 0
-            }
-            if ($attempt -eq 6) {
-              throw "Published package could not be restored from NuGet."
-            }
-            Start-Sleep -Seconds 20
+          if ($env:INPUT_DRY_RUN -eq "true") {
+            $arguments += "--dry-run"
+          }
+          else {
+            $arguments += "--execute"
           }
 
-      - name: Run smoke consumer against published package
-        if: ${{ !inputs.dry_run }}
-        run: |
-          dotnet run --project bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj `
-            --configuration Release `
-            --no-restore `
-            -p:RheoStoragePackageVersion=${{ steps.metadata.outputs.version }}
+          & cargo @arguments
