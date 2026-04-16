@@ -35,9 +35,9 @@ fn bytes_from_output(ptr: *mut u8, len: usize) -> Vec<u8> {
 fn analyze_path_returns_json() {
     let fixture = std::fs::canonicalize(fixture_path()).unwrap();
     let fixture = CString::new(fixture.to_string_lossy().as_bytes()).unwrap();
-    let mut out_ptr = ptr::null_mut();
+    let mut out_ptr: *mut u8 = ptr::null_mut();
     let mut out_len = 0;
-    let mut err_ptr = ptr::null_mut();
+    let mut err_ptr: *mut u8 = ptr::null_mut();
     let mut err_len = 0;
 
     let status = unsafe {
@@ -63,9 +63,9 @@ fn file_info_and_directory_info_include_optional_payloads() {
     let temp = tempdir().unwrap();
     let temp_c = CString::new(temp.path().to_string_lossy().as_bytes()).unwrap();
 
-    let mut out_ptr = ptr::null_mut();
+    let mut out_ptr: *mut u8 = ptr::null_mut();
     let mut out_len = 0;
-    let mut err_ptr = ptr::null_mut();
+    let mut err_ptr: *mut u8 = ptr::null_mut();
     let mut err_len = 0;
 
     let file_status = unsafe {
@@ -106,9 +106,9 @@ fn write_read_list_and_delete_round_trip_non_ascii_paths() {
     let file_c = CString::new(file.to_string_lossy().as_bytes()).unwrap();
     let renamed = nested.join("renamed.txt");
     let renamed_name_c = CString::new("renamed.txt").unwrap();
-    let mut out_ptr = ptr::null_mut();
+    let mut out_ptr: *mut u8 = ptr::null_mut();
     let mut out_len = 0;
-    let mut err_ptr = ptr::null_mut();
+    let mut err_ptr: *mut u8 = ptr::null_mut();
     let mut err_len = 0;
 
     let status = unsafe {
@@ -186,7 +186,7 @@ fn write_read_list_and_delete_round_trip_non_ascii_paths() {
 
 #[test]
 fn invalid_arguments_produce_error_payload() {
-    let mut err_ptr = ptr::null_mut();
+    let mut err_ptr: *mut u8 = ptr::null_mut();
     let mut err_len = 0;
     let status = unsafe { rheo_delete_file(ptr::null(), &mut err_ptr, &mut err_len) };
 
