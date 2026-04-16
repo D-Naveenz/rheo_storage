@@ -1,23 +1,24 @@
 use std::path::Path;
 
 use anyhow::Result;
-use rheo_repo_tool::{RepoConfig, verify_release};
+use rheo_tool_core::{CommandResult, run_command};
 
-use crate::package::{PackageOptions, verify as verify_package_flow};
-use crate::process::run_command;
+use crate::{PackageOptions, RheoRepoConfig, verify_release};
 
-pub fn verify_release_config(repo_root: &Path) -> Result<()> {
-    verify_release(repo_root)
+pub fn verify_release_config(repo_root: &Path) -> Result<CommandResult> {
+    verify_release(repo_root)?;
+    Ok(CommandResult::success())
 }
 
-pub fn verify_ci(repo_root: &Path, config: &RepoConfig) -> Result<()> {
+pub fn verify_ci(repo_root: &Path, config: &RheoRepoConfig) -> Result<CommandResult> {
     verify_release_config(repo_root)?;
 
     for package in [
         "rheo_storage",
         "rheo_storage_ffi",
-        "rheo_repo_tool",
-        "rheo_storage_def_builder",
+        "rheo_tool_core",
+        "rheo_tool_ui",
+        "rheo_tool_rheo_storage",
         "rheo_tool",
     ] {
         run_command(
@@ -48,8 +49,9 @@ pub fn verify_ci(repo_root: &Path, config: &RepoConfig) -> Result<()> {
     )?;
     for package in [
         "rheo_storage_ffi",
-        "rheo_repo_tool",
-        "rheo_storage_def_builder",
+        "rheo_tool_core",
+        "rheo_tool_ui",
+        "rheo_tool_rheo_storage",
         "rheo_tool",
     ] {
         run_command(
@@ -79,8 +81,9 @@ pub fn verify_ci(repo_root: &Path, config: &RepoConfig) -> Result<()> {
     )?;
     for package in [
         "rheo_storage_ffi",
-        "rheo_repo_tool",
-        "rheo_storage_def_builder",
+        "rheo_tool_core",
+        "rheo_tool_ui",
+        "rheo_tool_rheo_storage",
         "rheo_tool",
     ] {
         run_command(
@@ -96,10 +99,10 @@ pub fn verify_ci(repo_root: &Path, config: &RepoConfig) -> Result<()> {
         repo_root,
     )?;
 
-    Ok(())
+    Ok(CommandResult::success())
 }
 
-pub fn verify_docs(repo_root: &Path) -> Result<()> {
+pub fn verify_docs(repo_root: &Path) -> Result<CommandResult> {
     run_command(
         "cargo",
         &[
@@ -111,7 +114,13 @@ pub fn verify_docs(repo_root: &Path) -> Result<()> {
         ],
         repo_root,
     )?;
-    for package in ["rheo_storage_ffi", "rheo_repo_tool", "rheo_tool"] {
+    for package in [
+        "rheo_storage_ffi",
+        "rheo_tool_core",
+        "rheo_tool_ui",
+        "rheo_tool_rheo_storage",
+        "rheo_tool",
+    ] {
         run_command(
             "cargo",
             &[
@@ -123,13 +132,14 @@ pub fn verify_docs(repo_root: &Path) -> Result<()> {
             repo_root,
         )?;
     }
-    Ok(())
+
+    Ok(CommandResult::success())
 }
 
 pub fn verify_package(
     repo_root: &Path,
-    config: &RepoConfig,
+    config: &RheoRepoConfig,
     options: &PackageOptions,
-) -> Result<()> {
-    verify_package_flow(repo_root, config, options)
+) -> Result<CommandResult> {
+    crate::package_flow::verify(repo_root, config, options)
 }

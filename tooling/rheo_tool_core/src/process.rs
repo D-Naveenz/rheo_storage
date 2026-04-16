@@ -70,16 +70,6 @@ fn prepare_command<'a>(
     }
 
     if program.eq_ignore_ascii_case("dotnet")
-        && std::env::var_os("NUGET_PACKAGES").is_none()
-        && !envs.iter().any(|(key, _)| *key == "NUGET_PACKAGES")
-    {
-        let packages_dir = cwd.join(".nuget").join("packages");
-        fs::create_dir_all(&packages_dir)
-            .with_context(|| format!("failed to create {}", packages_dir.display()))?;
-        command.env("NUGET_PACKAGES", packages_dir);
-    }
-
-    if program.eq_ignore_ascii_case("dotnet")
         && std::env::var_os("DOTNET_SKIP_FIRST_TIME_EXPERIENCE").is_none()
         && !envs
             .iter()
@@ -89,4 +79,30 @@ fn prepare_command<'a>(
     }
 
     Ok(command)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsStr;
+
+    use tempfile::tempdir;
+
+    use super::prepare_command;
+
+    #[test]
+    fn dotnet_defaults_to_repo_local_cli_home_only() {
+        let temp = tempdir().unwrap();
+        let command = prepare_command("dotnet", &[], temp.path(), &[]).unwrap();
+        let envs = command.get_envs().collect::<Vec<_>>();
+
+        assert!(envs.iter().any(|(key, value)| {
+            *key == OsStr::new("DOTNET_CLI_HOME")
+                && value.is_some_and(|v| v.to_string_lossy().contains(".dotnet"))
+        }));
+        assert!(
+            !envs
+                .iter()
+                .any(|(key, _)| *key == OsStr::new("NUGET_PACKAGES"))
+        );
+    }
 }

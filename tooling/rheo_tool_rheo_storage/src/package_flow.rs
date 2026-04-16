@@ -2,10 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use rheo_repo_tool::{RepoConfig, sync, verify_release};
-use zip::ZipArchive;
+use rheo_tool_core::{
+    CommandResult, inspect_package_entries, run_command, run_command_with_env, write_nuget_config,
+};
 
-use crate::process::{run_command, run_command_with_env};
+use crate::{RheoRepoConfig, sync, verify_release};
 
 #[derive(Debug, Clone)]
 pub struct PackageOptions {
@@ -17,7 +18,11 @@ pub struct PackageOptions {
     pub execute_publish: bool,
 }
 
-pub fn pack(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) -> Result<PathBuf> {
+pub fn pack(
+    repo_root: &Path,
+    config: &RheoRepoConfig,
+    options: &PackageOptions,
+) -> Result<CommandResult> {
     verify_release(repo_root)?;
     sync(repo_root)?;
 
@@ -49,16 +54,25 @@ pub fn pack(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) -> 
 
     let package_path = nuget_output.join(format!("{}.{}.nupkg", config.nuget.package_id, version));
     inspect_package_contents(&package_path, config)?;
-    Ok(package_path)
+
+    Ok(CommandResult::with_message(format!(
+        "Packed {}",
+        package_path.display()
+    )))
 }
 
-pub fn verify(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) -> Result<()> {
+pub fn verify(
+    repo_root: &Path,
+    config: &RheoRepoConfig,
+    options: &PackageOptions,
+) -> Result<CommandResult> {
+    pack(repo_root, config, options)?;
+
     let version = effective_version(config, &options.version_override);
-    let package_path = pack(repo_root, config, options)?;
-    let working_root = package_path
-        .parent()
-        .and_then(Path::parent)
-        .context("package output folder should have a parent")?;
+    let working_root = working_root(repo_root, options.output_dir.as_ref())?;
+    let package_path = working_root
+        .join("nuget")
+        .join(format!("{}.{}.nupkg", config.nuget.package_id, version));
     let local_config = working_root.join("local-package.nuget.config");
     write_nuget_config(
         &local_config,
@@ -88,51 +102,25 @@ pub fn verify(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) -
         &working_root.join("smoke-aot"),
         &config.ci.aot_runtime_smoke,
     )?;
-    Ok(())
+    Ok(CommandResult::with_message(
+        "Package verified successfully.",
+    ))
 }
 
-pub fn publish(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) -> Result<()> {
-    let version = effective_version(config, &options.version_override);
-    let package_path = pack(repo_root, config, options)?;
-    let working_root = package_path
-        .parent()
-        .and_then(Path::parent)
-        .context("package output folder should have a parent")?;
-    let local_config = working_root.join("local-package.nuget.config");
-    write_nuget_config(
-        &local_config,
-        &[
-            package_path
-                .parent()
-                .context("package path should have a parent")?
-                .to_path_buf(),
-            PathBuf::from(&config.nuget.source),
-        ],
-    )?;
-
-    restore_smoke_consumer(repo_root, config, &version, &local_config, None, false)?;
-    run_smoke_consumer(repo_root, config, &version)?;
-    restore_smoke_consumer(
-        repo_root,
-        config,
-        &version,
-        &local_config,
-        Some(&config.ci.aot_runtime_smoke),
-        true,
-    )?;
-    publish_aot_smoke_consumer(
-        repo_root,
-        config,
-        &version,
-        &working_root.join("smoke-aot"),
-        &config.ci.aot_runtime_smoke,
-    )?;
+pub fn publish(
+    repo_root: &Path,
+    config: &RheoRepoConfig,
+    options: &PackageOptions,
+) -> Result<CommandResult> {
+    verify(repo_root, config, options)?;
 
     if !options.execute_publish {
-        println!("Dry run complete. Package was verified but not published.");
-        return Ok(());
+        return Ok(CommandResult::with_message(
+            "Dry run complete. Package was verified but not published.",
+        ));
     }
 
+    let version = effective_version(config, &options.version_override);
     let source = options
         .source_override
         .clone()
@@ -143,6 +131,12 @@ pub fn publish(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) 
         .unwrap_or_else(|| config.publish.api_key_env.clone());
     let api_key =
         std::env::var(&api_key_env).with_context(|| format!("{api_key_env} is not set"))?;
+
+    let working_root = working_root(repo_root, options.output_dir.as_ref())?;
+    let package_path = working_root
+        .join("nuget")
+        .join(format!("{}.{}.nupkg", config.nuget.package_id, version));
+
     run_command_with_env(
         "dotnet",
         &[
@@ -163,12 +157,15 @@ pub fn publish(repo_root: &Path, config: &RepoConfig, options: &PackageOptions) 
     write_nuget_config(&published_config, &[PathBuf::from(source)])?;
     restore_smoke_consumer(repo_root, config, &version, &published_config, None, false)?;
     run_smoke_consumer(repo_root, config, &version)?;
-    Ok(())
+
+    Ok(CommandResult::with_message(
+        "Published package successfully.",
+    ))
 }
 
 fn stage_native_assets(
     repo_root: &Path,
-    config: &RepoConfig,
+    config: &RheoRepoConfig,
     options: &PackageOptions,
     stage_root: &Path,
 ) -> Result<()> {
@@ -223,18 +220,8 @@ fn stage_native_assets(
     Ok(())
 }
 
-fn inspect_package_contents(package_path: &Path, config: &RepoConfig) -> Result<()> {
-    let file = fs::File::open(package_path)
-        .with_context(|| format!("failed to open {}", package_path.display()))?;
-    let mut archive = ZipArchive::new(file)
-        .with_context(|| format!("failed to read {}", package_path.display()))?;
-
-    let mut entries = Vec::with_capacity(archive.len());
-    for index in 0..archive.len() {
-        let file = archive.by_index(index)?;
-        entries.push(file.name().replace('\\', "/"));
-    }
-
+fn inspect_package_contents(package_path: &Path, config: &RheoRepoConfig) -> Result<()> {
+    let entries = inspect_package_entries(package_path)?;
     if !entries
         .iter()
         .any(|entry| entry == "lib/net10.0/Rheo.Storage.dll")
@@ -248,37 +235,12 @@ fn inspect_package_contents(package_path: &Path, config: &RepoConfig) -> Result<
             bail!("native asset missing from package: {expected}");
         }
     }
-
-    Ok(())
-}
-
-fn write_nuget_config(path: &Path, sources: &[PathBuf]) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("failed to create {}", parent.display()))?;
-    }
-
-    let mut body = String::from(
-        r#"<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-"#,
-    );
-    for (index, source) in sources.iter().enumerate() {
-        body.push_str(&format!(
-            "    <add key=\"source{index}\" value=\"{}\" />\n",
-            source.display()
-        ));
-    }
-    body.push_str("  </packageSources>\n</configuration>\n");
-    fs::write(path, body).with_context(|| format!("failed to write {}", path.display()))?;
     Ok(())
 }
 
 fn restore_smoke_consumer(
     repo_root: &Path,
-    config: &RepoConfig,
+    config: &RheoRepoConfig,
     version: &str,
     nuget_config: &Path,
     runtime: Option<&str>,
@@ -301,7 +263,7 @@ fn restore_smoke_consumer(
     run_command("dotnet", &args, repo_root)
 }
 
-fn run_smoke_consumer(repo_root: &Path, config: &RepoConfig, version: &str) -> Result<()> {
+fn run_smoke_consumer(repo_root: &Path, config: &RheoRepoConfig, version: &str) -> Result<()> {
     run_command(
         "dotnet",
         &[
@@ -319,7 +281,7 @@ fn run_smoke_consumer(repo_root: &Path, config: &RepoConfig, version: &str) -> R
 
 fn publish_aot_smoke_consumer(
     repo_root: &Path,
-    config: &RepoConfig,
+    config: &RheoRepoConfig,
     version: &str,
     output_dir: &Path,
     runtime: &str,
@@ -355,7 +317,7 @@ fn publish_aot_smoke_consumer(
     )
 }
 
-fn effective_version(config: &RepoConfig, override_value: &Option<String>) -> String {
+fn effective_version(config: &RheoRepoConfig, override_value: &Option<String>) -> String {
     override_value
         .clone()
         .unwrap_or_else(|| config.versions.nuget_package.clone())
@@ -375,78 +337,4 @@ fn reset_directory(path: &Path) -> Result<()> {
     }
     fs::create_dir_all(path).with_context(|| format!("failed to create {}", path.display()))?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-    use std::fs::File;
-    use std::io::Write;
-
-    use rheo_repo_tool::{
-        CiConfig, NuGetConfig, PublishConfig, RepoConfig, TargetsConfig, VersionConfig,
-    };
-    use tempfile::tempdir;
-    use zip::ZipWriter;
-    use zip::write::SimpleFileOptions;
-
-    use super::inspect_package_contents;
-
-    fn sample_config() -> RepoConfig {
-        RepoConfig {
-            versions: VersionConfig {
-                rust_workspace: "0.2.0".to_owned(),
-                nuget_package: "2.0.0".to_owned(),
-            },
-            nuget: NuGetConfig {
-                package_id: "Rheo.Storage".to_owned(),
-                source: "https://api.nuget.org/v3/index.json".to_owned(),
-                authors: vec!["Naveen Dharmathunga".to_owned()],
-                description: "desc".to_owned(),
-                tags: vec!["storage".to_owned()],
-                readme: "README.md".to_owned(),
-                icon: None,
-                repository_url: "https://example.com".to_owned(),
-                project_url: "https://example.com".to_owned(),
-            },
-            ci: CiConfig {
-                smoke_project: "smoke.csproj".to_owned(),
-                package_project: "pkg.csproj".to_owned(),
-                tests_project: "tests.csproj".to_owned(),
-                native_runtimes: vec!["win-x64".to_owned(), "win-arm64".to_owned()],
-                host_runtime_smoke: "win-x64".to_owned(),
-                aot_runtime_smoke: "win-x64".to_owned(),
-            },
-            publish: PublishConfig {
-                environment: "nuget-production".to_owned(),
-                api_key_env: "NUGET_API_KEY".to_owned(),
-            },
-            targets: TargetsConfig {
-                rust_targets: BTreeMap::from([
-                    ("win-x64".to_owned(), "x86_64-pc-windows-msvc".to_owned()),
-                    ("win-arm64".to_owned(), "aarch64-pc-windows-msvc".to_owned()),
-                ]),
-            },
-        }
-    }
-
-    #[test]
-    fn inspects_expected_nupkg_entries() {
-        let temp = tempdir().unwrap();
-        let package_path = temp.path().join("Rheo.Storage.2.0.0.nupkg");
-        let file = File::create(&package_path).unwrap();
-        let mut writer = ZipWriter::new(file);
-        let options = SimpleFileOptions::default();
-        for entry in [
-            "lib/net10.0/Rheo.Storage.dll",
-            "runtimes/win-x64/native/rheo_storage_ffi.dll",
-            "runtimes/win-arm64/native/rheo_storage_ffi.dll",
-        ] {
-            writer.start_file(entry, options).unwrap();
-            writer.write_all(b"x").unwrap();
-        }
-        writer.finish().unwrap();
-
-        inspect_package_contents(&package_path, &sample_config()).unwrap();
-    }
 }

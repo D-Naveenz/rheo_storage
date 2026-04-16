@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use rheo_storage_def_builder::{
-    BuilderAction, LoggingOptions, execute_action, init_logging, print_report,
-};
+use rheo_tool_core::{CommandResult, ReportField, StructuredReport, ToolContext};
+
+use crate::{BuilderAction, LoggingOptions, execute_action, init_logging};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefsPaths {
@@ -13,15 +13,28 @@ pub struct DefsPaths {
 }
 
 impl DefsPaths {
+    pub fn from_context(context: &ToolContext) -> Self {
+        Self::from_repo_root(
+            &context.repo_root,
+            context.package_dir.clone(),
+            context.output_dir.clone(),
+            context.logs_dir.clone(),
+        )
+    }
+
     pub fn from_repo_root(
-        repo_root: &std::path::Path,
+        repo_root: &Path,
         package_dir: Option<PathBuf>,
         output_dir: Option<PathBuf>,
         logs_dir: Option<PathBuf>,
     ) -> Self {
         Self {
-            package_dir: package_dir
-                .unwrap_or_else(|| repo_root.join("rheo_storage_def_builder").join("package")),
+            package_dir: package_dir.unwrap_or_else(|| {
+                repo_root
+                    .join("tooling")
+                    .join("rheo_tool_rheo_storage")
+                    .join("package")
+            }),
             output_dir: output_dir.unwrap_or_else(|| repo_root.join("output")),
             logs_dir: logs_dir.unwrap_or_else(|| repo_root.join("logs")),
         }
@@ -76,43 +89,54 @@ pub enum DefsCommand {
     },
 }
 
-pub fn execute(
-    command: DefsCommand,
-    paths: &DefsPaths,
-    silent: bool,
-    verbose: u8,
-    interactive: bool,
-) -> Result<i32> {
+pub fn execute(command: DefsCommand, context: &ToolContext) -> Result<CommandResult> {
+    let paths = DefsPaths::from_context(context);
     let logging = init_logging(LoggingOptions {
-        silent,
-        verbose,
+        silent: context.silent,
+        verbose: context.verbose,
         logs_dir: paths.logs_dir.clone(),
-        interactive,
+        interactive: false,
     })?;
-    let action = resolve_action(command, paths);
+    let action = resolve_action(command, &paths);
     let report = execute_action(action, &logging.log_path, |_| {})
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    if !silent {
-        print_report(&report);
-    }
-    Ok(report.exit_code())
+
+    Ok(CommandResult {
+        exit_code: report.exit_code(),
+        report: Some(StructuredReport {
+            title: report.title().to_owned(),
+            fields: report
+                .fields()
+                .iter()
+                .map(|field| ReportField {
+                    label: field.label().to_owned(),
+                    value: field.value().to_owned(),
+                })
+                .collect(),
+        }),
+        message: None,
+    })
 }
 
-pub fn print_defs_help() {
-    println!("Defs commands:");
-    println!("  pack [--output <path>]");
-    println!("  build-trid-xml [--input <path>] [--output <path>]");
-    println!("  inspect [--input <path>]");
-    println!("  inspect-trid-xml [--input <path>]");
-    println!("  normalize [--input <path>] [--output <path>]");
-    println!("  verify --left <path> --right <path>");
-    println!("  sync-embedded [--input <path>] [--output <path>] [--check]");
+pub fn print_defs_help() -> String {
+    [
+        "Defs commands:",
+        "  defs pack [--output <path>]",
+        "  defs build-trid-xml [--input <path>] [--output <path>]",
+        "  defs inspect [--input <path>]",
+        "  defs inspect-trid-xml [--input <path>]",
+        "  defs normalize [--input <path>] [--output <path>]",
+        "  defs verify --left <path> --right <path>",
+        "  defs sync-embedded [--input <path>] [--output <path>] [--check]",
+    ]
+    .join("\n")
 }
 
-pub fn default_embedded_sync_paths(repo_root: &std::path::Path) -> (PathBuf, PathBuf) {
+pub fn default_embedded_sync_paths(repo_root: &Path) -> (PathBuf, PathBuf) {
     (
         repo_root
-            .join("rheo_storage_def_builder")
+            .join("tooling")
+            .join("rheo_tool_rheo_storage")
             .join("package")
             .join("triddefs_xml.7z"),
         repo_root
@@ -151,9 +175,9 @@ fn resolve_action(command: DefsCommand, paths: &DefsPaths) -> BuilderAction {
                 .package_dir
                 .parent()
                 .and_then(|parent| parent.parent())
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("."));
-            let (default_input, default_output) = default_embedded_sync_paths(&repo_root);
+                .and_then(|parent| parent.parent())
+                .unwrap_or_else(|| Path::new("."));
+            let (default_input, default_output) = default_embedded_sync_paths(repo_root);
             BuilderAction::SyncEmbedded {
                 input: input.unwrap_or(default_input),
                 output: output.unwrap_or(default_output),

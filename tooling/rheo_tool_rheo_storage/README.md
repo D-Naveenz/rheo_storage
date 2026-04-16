@@ -1,33 +1,28 @@
-# rheo_storage_def_builder
+# rheo_tool_rheo_storage
 
-`rheo_storage_def_builder` is the CLI tool that builds and inspects Rheo
-definitions packages.
+`rheo_tool_rheo_storage` is the repository-specific capability pack that powers
+`rheo_tool` for this workspace.
 
-It supports:
+It currently owns:
 
 - building reduced `filedefs.rpkg` packages from TrID XML inputs
 - reading `.xml`, extracted directories, and `.7z` archives
 - normalizing and verifying existing package files
 - refreshing the embedded runtime package with `sync-embedded`
-- interactive terminal use through the Rheo shell
-- script-friendly one-shot CLI commands
+- repository config/version synchronization
+- package verification and publish flows for `Rheo.Storage`
 
 ## Default Working Folders
 
-When the executable runs from a normal Cargo output folder, it uses
-executable-relative defaults:
+When `rheo_tool defs ...` runs against this capability pack, it uses these
+repo-relative defaults:
 
 - `package/` for source discovery
 - `output/` for generated package files
 - `logs/` for dated log files such as `2026-04-10_def_builder.log`
 
 The local `package/` folder inside this crate is excluded from Cargo package
-publishing and copied beside the built executable during a normal build.
-
-## Launch Modes
-
-- Run without a subcommand in a real terminal to open the interactive Rheo shell.
-- Run with an explicit command to use the classic non-interactive CLI flow.
+publishing and copied beside the built artifacts during a normal build.
 
 ## Repository
 

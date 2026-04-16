@@ -34,7 +34,7 @@
 - Keep shared .NET package metadata, runtime matrices, and workflow settings in `rheo.config.toml`, then drive synchronization and verification through `rheo_tool`.
 
 ## Builder Scope
-- `rheo_storage_def_builder` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
+- `rheo_tool_rheo_storage` should ingest TrID definitions directly from source material instead of assuming a prebuilt intermediate package.
 - Support `.xml` files, extracted definition directories, and `.7z` archives without requiring users to manually unpack large definition sets into the repo.
 - Preserve the logical `filedefs.rpkg` runtime contract even if the on-disk encoding changes, but keep generic package/container code in a shared crate instead of inside `rheo_storage`.
 - Keep MIME validation offline and deterministic by vendoring a normalized IANA snapshot plus custom overlay types into the repo.

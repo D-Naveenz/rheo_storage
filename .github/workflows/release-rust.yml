@@ -59,9 +59,10 @@ jobs:
           cargo run -p rheo_tool -- verify release-config
           cargo test -p rheo_storage --all-features
           cargo test -p rheo_storage_ffi
-          cargo test -p rheo_repo_tool
+          cargo test -p rheo_tool_core
+          cargo test -p rheo_tool_ui
+          cargo test -p rheo_tool_rheo_storage
           cargo test -p rheo_tool
-          cargo test -p rheo_storage_def_builder
           dotnet test --configuration Release bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
 
       - name: Dry run workspace release

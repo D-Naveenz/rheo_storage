@@ -7,8 +7,10 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - `rheo_rpkg`: generic MessagePack-based `RPKG` v2 container crate
 - `rheo_storage`: core runtime library
 - `rheo_storage_ffi`: native C ABI wrapper crate for .NET and other FFI consumers
-- `rheo_storage_def_builder`: definitions package engine that powers repo tooling workflows
-- `rheo_tool`: umbrella operator CLI for definitions, verification, packaging, and release flows
+- `tooling/rheo_tool`: umbrella operator CLI for definitions, verification, packaging, and release flows
+- `tooling/rheo_tool_core`: reusable command, registry, process, and report primitives for Rheo toolchains
+- `tooling/rheo_tool_ui`: shared interactive shell UI over the tool registry
+- `tooling/rheo_tool_rheo_storage`: this repository's defs/config/package/release capability pack
 
 ## Crates
 
@@ -24,18 +26,26 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - Native interop layer over `rheo_storage`.
 - Exposes a path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, operation handles for async/progress workflows, watch handles for directory monitoring, and write sessions for streamed uploads.
 
-### `rheo_storage_def_builder`
-- Internal builder engine for TrID ingestion, package serialization, normalization, and embedded package refresh.
-- Shared by repo-facing tooling so definition workflows stay in one implementation path.
-
 ### `rheo_tool`
 - Primary operator CLI for this repository.
 - Owns `defs`, `verify`, `package`, `release`, `config`, and `version` command groups.
 - Supports direct commands for automation and an interactive shell when launched without a subcommand in a real terminal.
 
+### `rheo_tool_core`
+- Shared registry, command execution context, process helpers, and structured output model.
+- Designed for reuse by other Rheo repositories without pulling in repo-specific defs or package logic.
+
+### `rheo_tool_ui`
+- Shared interactive shell layer over `rheo_tool_core`.
+- Keeps section navigation and prompt handling out of repo-specific capability code.
+
+### `rheo_tool_rheo_storage`
+- Repository-specific command capability pack for config sync, defs workflows, CI/package verification, and release packaging.
+- Owns the TrID/package assets and defs engine that used to live in the old standalone builder app.
+
 ## Builder Package Assets
-- `rheo_storage_def_builder/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
-- That folder is excluded from Cargo package publishing, but `rheo_storage_def_builder` copies it into the active Cargo output directory during build.
+- `tooling/rheo_tool_rheo_storage/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
+- That folder is excluded from Cargo package publishing, but `rheo_tool_rheo_storage` copies it into the active Cargo output directory during build.
 - The copy target mirrors MSBuild-style output behavior, so after building you can expect `target/debug/package` or `target/release/package` beside the builder executable.
 - The shared defs workflow now uses executable-relative defaults:
   - `package/` for TrID source discovery
@@ -55,7 +65,7 @@ APIs, definition-driven file analysis, and Windows-first integration.
 
 - Shared release metadata lives in [rheo.config.toml](./rheo.config.toml).
 - Local developer secrets belong in `.env.local`, created from [.env.example](./.env.example).
-- [`rheo_tool`](./rheo_tool) is the supported operator surface for config sync, version edits, env bootstrapping, verification, package validation, and publish flows.
+- [`rheo_tool`](./tooling/rheo_tool) is the supported operator surface for config sync, version edits, env bootstrapping, verification, package validation, and publish flows.
 - GitHub Actions delivery lanes are split by responsibility:
   - [ci.yml](./.github/workflows/ci.yml): pull request validation only
   - [package-verify.yml](./.github/workflows/package-verify.yml): build and verify a consumable NuGet package on `main`

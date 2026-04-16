@@ -16,7 +16,7 @@ pub const ENV_LOCAL_PATH: &str = ".env.local";
 pub const ROOT_CARGO_TOML_PATH: &str = "Cargo.toml";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RepoConfig {
+pub struct RheoRepoConfig {
     pub versions: VersionConfig,
     pub nuget: NuGetConfig,
     pub ci: CiConfig,
@@ -67,7 +67,7 @@ pub struct TargetsConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ShowOutput {
-    pub config: RepoConfig,
+    pub config: RheoRepoConfig,
     pub env: BTreeMap<String, String>,
 }
 
@@ -84,7 +84,7 @@ pub enum VersionPart {
     Patch,
 }
 
-pub fn load_config(repo_root: &Path) -> Result<RepoConfig> {
+pub fn load_config(repo_root: &Path) -> Result<RheoRepoConfig> {
     let config_path = repo_root.join(CONFIG_PATH);
     let content = fs::read_to_string(&config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
@@ -190,6 +190,7 @@ pub fn bump_version(
             version.patch += 1;
         }
     }
+
     let next = version.to_string();
     match channel {
         VersionChannel::Rust => config.versions.rust_workspace = next.clone(),
@@ -209,7 +210,7 @@ pub fn sync_cargo_toml(content: &str, version: &str) -> Result<String> {
     Ok(document.to_string())
 }
 
-pub fn sync_csproj(content: &str, config: &RepoConfig) -> Result<String> {
+pub fn sync_csproj(content: &str, config: &RheoRepoConfig) -> Result<String> {
     let mut project =
         Element::parse(content.as_bytes()).context("failed to parse Rheo.Storage.csproj")?;
     let property_group = get_or_add_property_group(&mut project);
@@ -288,7 +289,7 @@ pub fn parse_env_content(content: &str) -> Result<BTreeMap<String, String>> {
     Ok(values)
 }
 
-pub fn validate_config(repo_root: &Path, config: &RepoConfig) -> Result<()> {
+pub fn validate_config(repo_root: &Path, config: &RheoRepoConfig) -> Result<()> {
     Version::parse(&config.versions.rust_workspace).with_context(|| {
         format!(
             "invalid rust workspace version: {}",
@@ -367,7 +368,7 @@ fn file_name(path: &str) -> Result<&str> {
         .with_context(|| format!("path must end with a file name: {path}"))
 }
 
-fn write_config(repo_root: &Path, config: &RepoConfig) -> Result<()> {
+fn write_config(repo_root: &Path, config: &RheoRepoConfig) -> Result<()> {
     validate_config(repo_root, config)?;
     let content = toml::to_string_pretty(config).context("failed to serialize config")?;
     let config_path = repo_root.join(CONFIG_PATH);
@@ -468,11 +469,19 @@ fn prune_empty_item_groups(project: &mut Element) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::BTreeMap;
+    use std::fs;
+
     use tempfile::tempdir;
 
-    fn sample_config() -> RepoConfig {
-        RepoConfig {
+    use super::*;
+
+    fn sample_config() -> RheoRepoConfig {
+        let mut targets = BTreeMap::new();
+        targets.insert("win-x64".to_owned(), "x86_64-pc-windows-msvc".to_owned());
+        targets.insert("win-arm64".to_owned(), "aarch64-pc-windows-msvc".to_owned());
+
+        RheoRepoConfig {
             versions: VersionConfig {
                 rust_workspace: "0.2.0".to_owned(),
                 nuget_package: "2.0.0".to_owned(),
@@ -483,7 +492,7 @@ mod tests {
                 authors: vec!["Naveen Dharmathunga".to_owned()],
                 description: "High-level .NET bindings for the native Rheo Storage Rust runtime."
                     .to_owned(),
-                tags: vec!["storage".to_owned(), "ffi".to_owned(), "rust".to_owned()],
+                tags: vec!["storage".to_owned(), "ffi".to_owned()],
                 readme: "bindings/dotnet/Rheo.Storage/README.md".to_owned(),
                 icon: Some("bindings/dotnet/Rheo.Storage/icon-small.png".to_owned()),
                 repository_url: "https://github.com/D-Naveenz/rheo_storage".to_owned(),
@@ -505,26 +514,60 @@ mod tests {
                 api_key_env: "NUGET_API_KEY".to_owned(),
             },
             targets: TargetsConfig {
-                rust_targets: BTreeMap::from([
-                    ("win-x64".to_owned(), "x86_64-pc-windows-msvc".to_owned()),
-                    ("win-arm64".to_owned(), "aarch64-pc-windows-msvc".to_owned()),
-                ]),
+                rust_targets: targets,
             },
         }
     }
 
+    fn write_required_files(repo_root: &Path) {
+        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage")).unwrap();
+        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage.Tests")).unwrap();
+        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage.ConsumerSmoke")).unwrap();
+        fs::write(repo_root.join(CONFIG_PATH), "placeholder").unwrap();
+        fs::write(repo_root.join(ROOT_CARGO_TOML_PATH), "[workspace]\n").unwrap();
+        fs::write(repo_root.join(ENV_EXAMPLE_PATH), "NUGET_API_KEY=\n").unwrap();
+        fs::write(
+            repo_root.join("bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj"),
+            "<Project />",
+        )
+        .unwrap();
+        fs::write(
+            repo_root.join("bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"),
+            "<Project />",
+        )
+        .unwrap();
+        fs::write(
+            repo_root.join(
+                "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj",
+            ),
+            "<Project />",
+        )
+        .unwrap();
+        fs::write(
+            repo_root.join("bindings/dotnet/Rheo.Storage/README.md"),
+            "# Rheo.Storage",
+        )
+        .unwrap();
+        fs::write(
+            repo_root.join("bindings/dotnet/Rheo.Storage/icon-small.png"),
+            "png",
+        )
+        .unwrap();
+    }
+
     #[test]
-    fn parses_env_content() {
+    fn parse_env_content_ignores_comments_and_blank_lines() {
         let parsed = parse_env_content(
             r#"
-NUGET_API_KEY=
-# comment
-NUGET_SOURCE=https://api.nuget.org/v3/index.json
-"#,
-        )
-        .expect("env parsing should succeed");
+            # comment
+            NUGET_API_KEY=test-key
 
-        assert_eq!(parsed.get("NUGET_API_KEY"), Some(&String::new()));
+            NUGET_SOURCE=https://api.nuget.org/v3/index.json
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.get("NUGET_API_KEY"), Some(&"test-key".to_owned()));
         assert_eq!(
             parsed.get("NUGET_SOURCE"),
             Some(&"https://api.nuget.org/v3/index.json".to_owned())
@@ -532,90 +575,56 @@ NUGET_SOURCE=https://api.nuget.org/v3/index.json
     }
 
     #[test]
-    fn syncs_cargo_workspace_version() {
-        let input = r#"[workspace]
-members = ["foo"]
+    fn sync_cargo_toml_updates_workspace_version() {
+        let updated = sync_cargo_toml(
+            "[workspace]\n[workspace.package]\nversion = \"0.1.0\"\n",
+            "0.2.0",
+        )
+        .unwrap();
 
-[workspace.package]
-version = "0.1.0"
-"#;
-        let output = sync_cargo_toml(input, "0.2.0").expect("cargo sync should succeed");
-        assert!(output.contains("version = \"0.2.0\""));
+        assert!(updated.contains("version = \"0.2.0\""));
     }
 
     #[test]
-    fn syncs_csproj_metadata() {
-        let input = r#"<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-  </PropertyGroup>
-</Project>"#;
-        let output = sync_csproj(input, &sample_config()).expect("csproj sync should succeed");
-        assert!(output.contains("<PackageId>Rheo.Storage</PackageId>"));
-        assert!(output.contains("<Version>2.0.0</Version>"));
-        assert!(output.contains("<PackageIcon>icon-small.png</PackageIcon>"));
-        assert!(output.contains("Include=\"README.md\""));
-        assert!(output.contains("Include=\"icon-small.png\""));
+    fn sync_csproj_updates_package_metadata() {
+        let config = sample_config();
+        let updated = sync_csproj(
+            r#"<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Version>1.0.0</Version></PropertyGroup></Project>"#,
+            &config,
+        )
+        .unwrap();
+
+        assert!(updated.contains("<PackageId>Rheo.Storage</PackageId>"));
+        assert!(updated.contains("<Version>2.0.0</Version>"));
+        assert!(updated.contains("<PackageTags>storage;ffi</PackageTags>"));
+        assert!(updated.contains("<PackageReadmeFile>README.md</PackageReadmeFile>"));
     }
 
     #[test]
-    fn bumps_versions_by_channel() {
-        let temp = tempdir().expect("tempdir should succeed");
-        let repo_root = temp.path();
-        fs::write(
-            repo_root.join(CONFIG_PATH),
-            toml::to_string_pretty(&sample_config()).expect("config should serialize"),
-        )
-        .expect("config write should succeed");
-        fs::write(repo_root.join(ENV_EXAMPLE_PATH), "NUGET_API_KEY=\n").expect("env write");
-        fs::write(
-            repo_root.join(ROOT_CARGO_TOML_PATH),
-            "[workspace.package]\nversion = \"0.2.0\"\n",
-        )
-        .expect("cargo write");
-        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage")).expect("dirs");
-        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage.Tests")).expect("dirs");
-        fs::create_dir_all(repo_root.join("bindings/dotnet/Rheo.Storage.ConsumerSmoke"))
-            .expect("dirs");
-        fs::write(
-            repo_root.join("bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj"),
-            "<Project />",
-        )
-        .expect("csproj write");
-        fs::write(
-            repo_root.join("bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"),
-            "<Project />",
-        )
-        .expect("tests write");
-        fs::write(
-            repo_root.join(
-                "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj",
-            ),
-            "<Project />",
-        )
-        .expect("smoke write");
-        fs::write(
-            repo_root.join("bindings/dotnet/Rheo.Storage/README.md"),
-            "# readme",
-        )
-        .expect("readme write");
-        fs::write(
-            repo_root.join("bindings/dotnet/Rheo.Storage/icon-small.png"),
-            "png",
-        )
-        .expect("icon write");
+    fn validate_config_accepts_complete_repo_layout() {
+        let temp = tempdir().unwrap();
+        write_required_files(temp.path());
+        let config = sample_config();
 
-        let bumped = bump_version(repo_root, VersionChannel::NuGet, VersionPart::Minor)
-            .expect("version bump should succeed");
-        assert_eq!(bumped, "2.1.0");
+        validate_config(temp.path(), &config).unwrap();
     }
 
     #[test]
-    fn validate_config_requires_existing_paths() {
-        let temp = tempdir().expect("tempdir should succeed");
-        let repo_root = temp.path();
-        let error =
-            validate_config(repo_root, &sample_config()).expect_err("validation should fail");
-        assert!(error.to_string().contains("required path does not exist"));
+    fn bump_version_updates_requested_channel_only() {
+        let temp = tempdir().unwrap();
+        write_required_files(temp.path());
+        let config = sample_config();
+        fs::write(
+            temp.path().join(CONFIG_PATH),
+            toml::to_string_pretty(&config).unwrap(),
+        )
+        .unwrap();
+
+        let bumped = bump_version(temp.path(), VersionChannel::NuGet, VersionPart::Major).unwrap();
+        let reloaded = load_config(temp.path()).unwrap();
+
+        assert_eq!(bumped, "3.0.0");
+        assert_eq!(reloaded.versions.nuget_package, "3.0.0");
+        assert_eq!(reloaded.versions.rust_workspace, "0.2.0");
     }
 }

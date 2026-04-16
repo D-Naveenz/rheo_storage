@@ -8,7 +8,7 @@ and package publication are treated as separate concerns.
 - Shared package metadata lives in [`rheo.config.toml`](../../rheo.config.toml).
 - Local developer secrets live in `.env.local`, created from
   [`.env.example`](../../.env.example).
-- [`rheo_tool`](../../rheo_tool) is the supported way to inspect and
+- [`rheo_tool`](../../tooling/rheo_tool) is the supported way to inspect and
   synchronize repository configuration, run CI-equivalent checks locally, and
   drive NuGet verification and publishing.
 

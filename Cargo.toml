@@ -1,11 +1,12 @@
 [workspace]
 members = [
     "rheo_rpkg",
-    "rheo_repo_tool",
     "rheo_storage",
     "rheo_storage_ffi",
-    "rheo_storage_def_builder",
-    "rheo_tool",
+    "tooling/rheo_tool",
+    "tooling/rheo_tool_core",
+    "tooling/rheo_tool_rheo_storage",
+    "tooling/rheo_tool_ui",
 ]
 resolver = "3"
 

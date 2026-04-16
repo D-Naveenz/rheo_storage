@@ -1,0 +1,17 @@
+[package]
+name = "rheo_tool_core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Reusable command, process, and reporting core for Rheo tooling."
+readme = "../rheo_tool/README.md"
+
+[dependencies]
+anyhow = "1.0"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3.27"
