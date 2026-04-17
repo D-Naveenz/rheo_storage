@@ -2,20 +2,18 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use clap::{ArgAction, Parser, ValueEnum};
-use rheo_tool_core::{
-    CommandRegistry, CommandResult, CommandSpec, SectionSpec, ToolCapability, ToolContext,
-};
 
 use crate::{
-    DefsCommand, PackageOptions, VersionChannel, VersionPart, bump_version, execute_defs, init_env,
-    load_config, pack_package, print_defs_help, publish_package, set_version, show, sync,
+    CommandResult, CommandSpec, DefsCommand, PackageOptions, SectionSpec, ToolContext,
+    VersionChannel, VersionPart, bump_version, execute_defs, init_env, load_config, pack_package,
+    print_defs_help, publish_package, set_version, show, sync,
 };
 
 pub struct RheoStorageCapability;
 
-impl ToolCapability for RheoStorageCapability {
-    fn register(&self, registry: &mut CommandRegistry) {
-        for section in [
+impl RheoStorageCapability {
+    pub fn sections(&self) -> Vec<SectionSpec> {
+        vec![
             SectionSpec {
                 name: "config",
                 prompt: "rheo:config> ",
@@ -46,11 +44,11 @@ impl ToolCapability for RheoStorageCapability {
                 prompt: "rheo:release> ",
                 summary: "Release commands",
             },
-        ] {
-            registry.add_section(section);
-        }
+        ]
+    }
 
-        let commands = [
+    pub fn commands(&self) -> Vec<CommandSpec> {
+        vec![
             command(
                 "config.show",
                 &["config", "show"],
@@ -203,11 +201,7 @@ impl ToolCapability for RheoStorageCapability {
                 "release",
                 release_publish_command,
             ),
-        ];
-
-        for command in commands {
-            registry.add_command(command);
-        }
+        ]
     }
 }
 
@@ -578,26 +572,25 @@ fn release_publish_command(context: &ToolContext, args: &[String]) -> Result<Com
 
 #[cfg(test)]
 mod tests {
-    use rheo_tool_core::{CommandRegistry, ToolCapability};
-
     use super::RheoStorageCapability;
 
     #[test]
     fn registration_adds_expected_sections_and_commands() {
-        let mut registry = CommandRegistry::new();
-        RheoStorageCapability.register(&mut registry);
+        let capability = RheoStorageCapability;
 
-        let sections = registry
+        let sections = capability
             .sections()
+            .into_iter()
             .map(|section| section.name)
             .collect::<Vec<_>>();
         assert_eq!(
             sections,
-            vec!["config", "defs", "package", "release", "verify", "version"]
+            vec!["config", "version", "defs", "verify", "package", "release"]
         );
 
-        let commands = registry
+        let commands = capability
             .commands()
+            .into_iter()
             .map(|command| command.id)
             .collect::<Vec<_>>();
         assert!(commands.contains(&"config.show"));

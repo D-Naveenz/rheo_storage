@@ -14,6 +14,9 @@ categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow = "1.0"
-rheo_tool_core = { path = "../rheo_tool_core" }
 rheo_tool_rheo_storage = { path = "../rheo_tool_rheo_storage" }
-rheo_tool_ui = { path = "../rheo_tool_ui" }
+shlex = "1.3"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3.27"

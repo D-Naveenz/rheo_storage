@@ -2,11 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use rheo_tool_core::{
-    CommandResult, inspect_package_entries, run_command, run_command_with_env, write_nuget_config,
-};
 
-use crate::{RheoRepoConfig, sync, verify_release};
+use crate::{
+    CommandResult, RheoRepoConfig, inspect_package_entries, run_command, run_command_with_env,
+    sync, verify_release, write_nuget_config,
+};
 
 #[derive(Debug, Clone)]
 pub struct PackageOptions {

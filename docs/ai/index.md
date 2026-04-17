@@ -3,6 +3,7 @@
 ## Primary Guides
 - [`project-guidelines.md`](./project-guidelines.md): implementation rules for the Rust rewrite.
 - [`continuous-learning.md`](./continuous-learning.md): lessons captured while working incrementally.
+- [`commit-message.md`](./commit-message.md): AI-facing prompt for generating commit messages from diffs.
 
 ## Architecture Decisions
 - [`../adr/ADR-001-rust-first-rewrite.md`](../adr/ADR-001-rust-first-rewrite.md): Rust-native API, Windows-first scope, no immediate FFI.

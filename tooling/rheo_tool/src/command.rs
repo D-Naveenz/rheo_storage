@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Result, bail};
 
-use crate::{CommandHandler, CommandResult, ToolContext};
+pub type CommandHandler =
+    Arc<dyn Fn(&ToolContext, &[String]) -> anyhow::Result<CommandResult> + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionSpec {
@@ -11,7 +14,7 @@ pub struct SectionSpec {
     pub summary: &'static str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CommandSpec {
     pub id: &'static str,
     pub path: &'static [&'static str],
@@ -104,12 +107,92 @@ impl CommandRegistry {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolContext {
+    pub repo_root: PathBuf,
+    pub silent: bool,
+    pub verbose: u8,
+    pub package_dir: Option<PathBuf>,
+    pub output_dir: Option<PathBuf>,
+    pub logs_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportField {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructuredReport {
+    pub title: String,
+    pub fields: Vec<ReportField>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandResult {
+    pub exit_code: i32,
+    pub report: Option<StructuredReport>,
+    pub message: Option<String>,
+}
+
+impl CommandResult {
+    pub fn success() -> Self {
+        Self {
+            exit_code: 0,
+            report: None,
+            message: None,
+        }
+    }
+
+    pub fn with_message(message: impl Into<String>) -> Self {
+        Self {
+            exit_code: 0,
+            report: None,
+            message: Some(message.into()),
+        }
+    }
+
+    pub fn with_report(report: StructuredReport) -> Self {
+        Self {
+            exit_code: 0,
+            report: Some(report),
+            message: None,
+        }
+    }
+
+    pub fn from_exit_code(exit_code: i32) -> Self {
+        Self {
+            exit_code,
+            report: None,
+            message: None,
+        }
+    }
+
+    pub fn print(&self, silent: bool) {
+        if silent {
+            return;
+        }
+
+        if let Some(message) = &self.message {
+            println!("{message}");
+        }
+
+        if let Some(report) = &self.report {
+            println!("{}", report.title);
+            for field in &report.fields {
+                println!("{:<20} {}", field.label, field.value);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     use super::*;
-    use crate::{StructuredReport, ToolContext};
 
     fn noop(_: &ToolContext, _: &[String]) -> Result<CommandResult> {
         Ok(CommandResult::success())
@@ -118,7 +201,7 @@ mod tests {
     fn report_handler(_: &ToolContext, args: &[String]) -> Result<CommandResult> {
         Ok(CommandResult::with_report(StructuredReport {
             title: "dispatch".to_owned(),
-            fields: vec![crate::ReportField {
+            fields: vec![ReportField {
                 label: "args".to_owned(),
                 value: args.join(" "),
             }],
@@ -150,7 +233,7 @@ mod tests {
             summary: "Config root",
             args_summary: "",
             section: "config",
-            handler: noop,
+            handler: Arc::new(noop),
         });
         registry.add_command(CommandSpec {
             id: "config.show",
@@ -158,7 +241,7 @@ mod tests {
             summary: "Show config",
             args_summary: "",
             section: "config",
-            handler: noop,
+            handler: Arc::new(noop),
         });
 
         let args = vec!["config".to_owned(), "show".to_owned(), "--x".to_owned()];
@@ -181,7 +264,7 @@ mod tests {
             summary: "Verify package",
             args_summary: "[--configuration <name>]",
             section: "verify",
-            handler: report_handler,
+            handler: Arc::new(report_handler),
         });
 
         let result = registry
@@ -216,7 +299,7 @@ mod tests {
             summary: "Show config",
             args_summary: "",
             section: "config",
-            handler: noop,
+            handler: Arc::new(noop),
         });
 
         let help = registry.help_text();

@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use rheo_tool_core::{CommandResult, ReportField, StructuredReport, ToolContext};
 
-use crate::{BuilderAction, LoggingOptions, execute_action, init_logging};
+use crate::{
+    BuilderAction, CommandResult, LoggingOptions, ReportField, StructuredReport, ToolContext,
+    execute_action, init_logging,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefsPaths {

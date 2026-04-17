@@ -4,9 +4,7 @@ members = [
     "rheo_storage",
     "rheo_storage_ffi",
     "tooling/rheo_tool",
-    "tooling/rheo_tool_core",
     "tooling/rheo_tool_rheo_storage",
-    "tooling/rheo_tool_ui",
 ]
 resolver = "3"
 

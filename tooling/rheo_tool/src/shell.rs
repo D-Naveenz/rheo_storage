@@ -1,7 +1,8 @@
 use std::io::{self, IsTerminal, Write};
 
 use anyhow::{Context, Result};
-use rheo_tool_core::{CommandRegistry, ToolContext};
+
+use crate::command::{CommandRegistry, CommandResult, ToolContext};
 
 pub fn can_launch() -> bool {
     io::stdin().is_terminal() && io::stdout().is_terminal()
@@ -50,16 +51,18 @@ pub fn run_shell(registry: &CommandRegistry, context: &ToolContext) -> Result<()
         }
 
         match registry.execute(context, &args) {
-            Ok(result) => {
-                result.print(context.silent);
-                if result.exit_code != 0 {
-                    println!("Command exited with status {}.", result.exit_code);
-                }
-            }
+            Ok(result) => print_result(context, result),
             Err(error) => eprintln!("{error:#}"),
         }
     }
     Ok(())
+}
+
+fn print_result(context: &ToolContext, result: CommandResult) {
+    result.print(context.silent);
+    if result.exit_code != 0 {
+        println!("Command exited with status {}.", result.exit_code);
+    }
 }
 
 fn prompt_for(registry: &CommandRegistry, current_section: &str) -> String {
@@ -76,13 +79,16 @@ fn prompt_for(registry: &CommandRegistry, current_section: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use anyhow::Result;
-    use rheo_tool_core::{CommandRegistry, CommandResult, CommandSpec, SectionSpec, ToolContext};
+
+    use crate::command::{CommandRegistry, CommandSpec, SectionSpec, ToolContext};
 
     use super::prompt_for;
 
-    fn noop(_: &ToolContext, _: &[String]) -> Result<CommandResult> {
-        Ok(CommandResult::success())
+    fn noop(_: &ToolContext, _: &[String]) -> Result<crate::command::CommandResult> {
+        Ok(crate::command::CommandResult::success())
     }
 
     #[test]
@@ -99,7 +105,7 @@ mod tests {
             summary: "Run CI checks",
             args_summary: "",
             section: "verify",
-            handler: noop,
+            handler: Arc::new(noop),
         });
 
         assert_eq!(prompt_for(&registry, "verify"), "rheo:verify> ");

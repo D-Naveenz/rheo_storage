@@ -8,8 +8,6 @@ APIs, definition-driven file analysis, and Windows-first integration.
 - `rheo_storage`: core runtime library
 - `rheo_storage_ffi`: native C ABI wrapper crate for .NET and other FFI consumers
 - `tooling/rheo_tool`: umbrella operator CLI for definitions, verification, packaging, and release flows
-- `tooling/rheo_tool_core`: reusable command, registry, process, and report primitives for Rheo toolchains
-- `tooling/rheo_tool_ui`: shared interactive shell UI over the tool registry
 - `tooling/rheo_tool_rheo_storage`: this repository's defs/config/package/release capability pack
 
 ## Crates
@@ -28,20 +26,14 @@ APIs, definition-driven file analysis, and Windows-first integration.
 
 ### `rheo_tool`
 - Primary operator CLI for this repository.
+- Owns the internal command registry, interactive shell, process helpers, and package inspection helpers under `tooling/rheo_tool/src`.
 - Owns `defs`, `verify`, `package`, `release`, `config`, and `version` command groups.
 - Supports direct commands for automation and an interactive shell when launched without a subcommand in a real terminal.
-
-### `rheo_tool_core`
-- Shared registry, command execution context, process helpers, and structured output model.
-- Designed for reuse by other Rheo repositories without pulling in repo-specific defs or package logic.
-
-### `rheo_tool_ui`
-- Shared interactive shell layer over `rheo_tool_core`.
-- Keeps section navigation and prompt handling out of repo-specific capability code.
 
 ### `rheo_tool_rheo_storage`
 - Repository-specific command capability pack for config sync, defs workflows, CI/package verification, and release packaging.
 - Owns the TrID/package assets and defs engine that used to live in the old standalone builder app.
+- Exposes repo-side command metadata and handlers that `rheo_tool` registers at compile time.
 
 ## Builder Package Assets
 - `tooling/rheo_tool_rheo_storage/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.

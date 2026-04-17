@@ -20,7 +20,6 @@ chrono = "0.4"
 clap = { version = "4.6", features = ["derive"] }
 once_cell = "1.21"
 quick-xml = { version = "0.39.2", features = ["serialize"] }
-rheo_tool_core = { path = "../rheo_tool_core" }
 rheo_rpkg = { path = "../../rheo_rpkg" }
 rheo_storage = { path = "../../rheo_storage" }
 rmp-serde = "1.3"
@@ -34,3 +33,4 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 xmltree = "0.12.0"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
