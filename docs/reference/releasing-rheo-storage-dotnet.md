@@ -46,6 +46,8 @@ cargo run -p rheo_tool -- verify package
     version that is already committed on `main`
   - when the version is already managed locally through `cargo run -p rheo_tool -- version ...`,
     run the workflow with `bump_version=false`
+  - runs `cargo release` in isolated mode, so release behavior is defined by the
+    workflow inputs and flags instead of a checked-in `release.toml`
 
 ## Versioning
 
