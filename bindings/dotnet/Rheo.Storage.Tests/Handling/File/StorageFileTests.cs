@@ -27,7 +27,7 @@ public sealed class StorageFileTests
         await System.IO.File.WriteAllBytesAsync(sourcePath, Enumerable.Repeat((byte)42, 512 * 1024).ToArray(), cancellationToken);
         var file = RheoStorage.File(sourcePath);
         var reported = new List<StorageProgress>();
-        var progress = new Progress<StorageProgress>(value => reported.Add(value));
+        var progress = new SynchronousProgress<StorageProgress>(reported.Add);
 
         var copy = await file.CopyAsync(temp.PathFor("copy.bin"), progress, overwrite: false, cancellationToken);
 

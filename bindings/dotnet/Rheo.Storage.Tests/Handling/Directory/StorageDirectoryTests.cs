@@ -30,7 +30,7 @@ public sealed class StorageDirectoryTests
         System.IO.File.WriteAllText(temp.PathFor("source", "nested", "file.txt"), "payload");
         var directory = RheoStorage.Directory(temp.PathFor("source"));
         var progressValues = new List<StorageProgress>();
-        var progress = new Progress<StorageProgress>(value => progressValues.Add(value));
+        var progress = new SynchronousProgress<StorageProgress>(progressValues.Add);
 
         var copy = await directory.CopyAsync(temp.PathFor("copy"), progress, overwrite: false, cancellationToken);
 

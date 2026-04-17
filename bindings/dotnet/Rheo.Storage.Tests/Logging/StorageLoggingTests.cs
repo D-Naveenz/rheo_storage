@@ -20,7 +20,7 @@ public sealed class StorageLoggingTests
         try
         {
             var file = RheoStorage.File(path);
-            var progress = new Progress<StorageProgress>(_ => { });
+            var progress = new SynchronousProgress<StorageProgress>(_ => { });
             await file.ReadBytesAsync(progress, cancellationToken);
         }
         finally
