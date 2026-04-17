@@ -13,6 +13,7 @@ internal sealed class NativeWriteSessionHandle : IDisposable
 
     internal static NativeWriteSessionHandle Create(string path, bool overwrite, bool createParentDirectories)
     {
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeSessions.rheo_write_session_create(
             path,
             NativeHelpers.ToNativeBool(overwrite),
@@ -27,6 +28,7 @@ internal sealed class NativeWriteSessionHandle : IDisposable
     internal unsafe void WriteChunk(ReadOnlySpan<byte> chunk)
     {
         ThrowIfDisposed();
+        NativeHelpers.EnsureSupportedPlatform();
         fixed (byte* ptr = chunk)
         {
             var status = NativeSessions.rheo_write_session_write_chunk(_handle, ptr, (nuint)chunk.Length, out var errorPtr, out var errorLen);
@@ -37,6 +39,7 @@ internal sealed class NativeWriteSessionHandle : IDisposable
     internal string Complete()
     {
         ThrowIfDisposed();
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeSessions.rheo_write_session_complete(_handle, out var pathPtr, out var pathLen, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
         return NativeMemory.ReadUtf8AndFree(pathPtr, pathLen);
@@ -49,6 +52,7 @@ internal sealed class NativeWriteSessionHandle : IDisposable
             return;
         }
 
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeSessions.rheo_write_session_abort(_handle, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
     }
@@ -60,6 +64,7 @@ internal sealed class NativeWriteSessionHandle : IDisposable
             return;
         }
 
+        NativeHelpers.EnsureSupportedPlatform();
         NativeSessions.rheo_write_session_free(_handle);
         _handle = 0;
         GC.SuppressFinalize(this);

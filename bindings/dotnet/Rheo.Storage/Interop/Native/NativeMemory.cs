@@ -20,8 +20,7 @@ internal static partial class NativeMemory
             return string.Empty;
         }
 
-        var bytes = new byte[(int)len];
-        Marshal.Copy(ptr, bytes, 0, bytes.Length);
+        var bytes = ReadBytes(ptr, len);
         rheo_string_free(ptr, len);
         return Encoding.UTF8.GetString(bytes);
     }
@@ -33,9 +32,25 @@ internal static partial class NativeMemory
             return [];
         }
 
+        var bytes = ReadBytes(ptr, len);
+        rheo_bytes_free(ptr, len);
+        return bytes;
+    }
+
+    internal static string ReadUtf8(nint ptr, nuint len)
+    {
+        if (ptr == 0 || len == 0)
+        {
+            return string.Empty;
+        }
+
+        return Encoding.UTF8.GetString(ReadBytes(ptr, len));
+    }
+
+    private static byte[] ReadBytes(nint ptr, nuint len)
+    {
         var bytes = new byte[(int)len];
         Marshal.Copy(ptr, bytes, 0, bytes.Length);
-        rheo_bytes_free(ptr, len);
         return bytes;
     }
 }

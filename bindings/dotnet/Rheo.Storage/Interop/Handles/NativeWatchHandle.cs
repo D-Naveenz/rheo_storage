@@ -14,6 +14,7 @@ internal sealed class NativeWatchHandle : IDisposable
 
     internal static NativeWatchHandle Create(string path, StorageWatchOptions options)
     {
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeWatching.rheo_watch_create(
             path,
             NativeHelpers.ToNativeBool(options.Recursive),
@@ -28,6 +29,7 @@ internal sealed class NativeWatchHandle : IDisposable
     internal StorageChangedEventArgs? ReceiveTimeout(TimeSpan timeout)
     {
         ThrowIfDisposed();
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeWatching.rheo_watch_recv_json_timeout(_handle, (ulong)Math.Max(0, timeout.TotalMilliseconds), out var jsonPtr, out var jsonLen, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
         var json = NativeMemory.ReadUtf8AndFree(jsonPtr, jsonLen);
@@ -43,6 +45,7 @@ internal sealed class NativeWatchHandle : IDisposable
             return;
         }
 
+        NativeHelpers.EnsureSupportedPlatform();
         var status = NativeWatching.rheo_watch_stop(_handle, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
     }
@@ -54,6 +57,7 @@ internal sealed class NativeWatchHandle : IDisposable
             return;
         }
 
+        NativeHelpers.EnsureSupportedPlatform();
         NativeWatching.rheo_watch_free(_handle);
         _handle = 0;
         GC.SuppressFinalize(this);

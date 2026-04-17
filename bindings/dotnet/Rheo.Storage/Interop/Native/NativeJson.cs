@@ -21,6 +21,7 @@ internal static class NativeJson
         var type when type == typeof(NativeDirectoryInformationDto) => NativeJsonContext.Default.NativeDirectoryInformationDto,
         var type when type == typeof(NativeStorageEntryDto[]) => NativeJsonContext.Default.NativeStorageEntryDtoArray,
         var type when type == typeof(NativeWatchEventDto) => NativeJsonContext.Default.NativeWatchEventDto,
+        var type when type == typeof(NativeLogRecordDto) => NativeJsonContext.Default.NativeLogRecordDto,
         _ => throw new NotSupportedException($"No generated JSON metadata is available for '{typeof(T).FullName}'."),
     });
 }
@@ -38,6 +39,7 @@ internal static class NativeJson
 [JsonSerializable(typeof(NativeStorageMetadataDto))]
 [JsonSerializable(typeof(NativeStorageEntryDto[]), TypeInfoPropertyName = "NativeStorageEntryDtoArray")]
 [JsonSerializable(typeof(NativeWatchEventDto))]
+[JsonSerializable(typeof(NativeLogRecordDto))]
 internal sealed partial class NativeJsonContext : JsonSerializerContext
 {
 }

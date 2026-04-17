@@ -10,6 +10,7 @@ internal static class NativeCallInvoker
 
     internal static string InvokeString(NativeDataCall call)
     {
+        NativeHelpers.EnsureSupportedPlatform();
         var status = call(out var dataPtr, out var dataLen, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
         return NativeMemory.ReadUtf8AndFree(dataPtr, dataLen);
@@ -17,6 +18,7 @@ internal static class NativeCallInvoker
 
     internal static byte[] InvokeBytes(NativeDataCall call)
     {
+        NativeHelpers.EnsureSupportedPlatform();
         var status = call(out var dataPtr, out var dataLen, out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
         return NativeMemory.ReadBytesAndFree(dataPtr, dataLen);
@@ -24,6 +26,7 @@ internal static class NativeCallInvoker
 
     internal static void InvokeUnit(NativeUnitCall call)
     {
+        NativeHelpers.EnsureSupportedPlatform();
         var status = call(out var errorPtr, out var errorLen);
         NativeHelpers.ThrowIfFailed(status, errorPtr, errorLen);
     }

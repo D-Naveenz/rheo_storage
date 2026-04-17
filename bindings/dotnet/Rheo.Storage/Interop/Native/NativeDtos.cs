@@ -66,3 +66,13 @@ internal sealed record NativeWatchEventDto(
     string Path,
     string? PreviousPath,
     long ObservedAtUtcMs);
+
+internal sealed record NativeLogRecordDto(
+    string Level,
+    string Target,
+    string Message,
+    ulong TimestampUnixMs,
+    string? ModulePath,
+    string? File,
+    uint? Line,
+    Dictionary<string, string> Fields);

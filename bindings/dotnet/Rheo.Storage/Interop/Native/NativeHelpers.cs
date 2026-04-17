@@ -3,12 +3,27 @@ using Rheo.Storage.Models.Analysis;
 using Rheo.Storage.Models.Information;
 using Rheo.Storage.Models.Progress;
 using Rheo.Storage.Models.Watching;
+using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace Rheo.Storage.Interop.Native;
 
 internal static class NativeHelpers
 {
     internal static byte ToNativeBool(bool value) => value ? (byte)1 : (byte)0;
+
+    internal static void EnsureSupportedPlatform()
+    {
+        if (OperatingSystem.IsWindows() &&
+            (RuntimeInformation.ProcessArchitecture == Architecture.X64 ||
+             RuntimeInformation.ProcessArchitecture == Architecture.Arm64))
+        {
+            return;
+        }
+
+        throw new PlatformNotSupportedException(
+            $"Rheo.Storage supports Windows x64 and Windows arm64 only. Current platform: {RuntimeInformation.OSDescription}, architecture: {RuntimeInformation.ProcessArchitecture}.");
+    }
 
     internal static void ThrowIfFailed(NativeStatus status, nint errorPtr, nuint errorLen)
     {
@@ -121,6 +136,20 @@ internal static class NativeHelpers
             snapshot.HasTotalBytes == 0 ? null : snapshot.TotalBytes,
             snapshot.BytesTransferred,
             snapshot.BytesPerSecond);
+
+    internal static LogLevel ToLogLevel(this NativeLogRecordDto record) =>
+        record.Level.ToLogLevel();
+
+    internal static LogLevel ToLogLevel(this string level) =>
+        level.ToUpperInvariant() switch
+        {
+            "TRACE" => LogLevel.Trace,
+            "DEBUG" => LogLevel.Debug,
+            "INFO" => LogLevel.Information,
+            "WARN" => LogLevel.Warning,
+            "ERROR" => LogLevel.Error,
+            _ => LogLevel.Information,
+        };
 
     private static DateTimeOffset? ToDateTimeOffset(long? unixMilliseconds) =>
         unixMilliseconds.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds.Value) : null;

@@ -6,6 +6,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
     <IsAotCompatible>true</IsAotCompatible>
     <PackageId>Rheo.Storage</PackageId>
     <Version>2.0.0</Version>
@@ -24,14 +25,17 @@
     <NativeCargoArgs Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">--release</NativeCargoArgs>
     <NativeDllPath>$(RepoRoot)target\$(NativeConfiguration)\rheo_storage_ffi.dll</NativeDllPath>
   </PropertyGroup>
-  <ItemGroup Condition="'$(StagedNativeRoot)' == ''">
-    <None Include="$(NativeDllPath)" PackagePath="runtimes\win-x64\native" Visible="false" Pack="true" />
-  </ItemGroup>
   <ItemGroup Condition="'$(StagedNativeRoot)' != ''">
     <None Include="$(StagedNativeRoot)\runtimes\**\native\*.dll" PackagePath="%(RecursiveDir)" Visible="false" Pack="true" />
   </ItemGroup>
-  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild;Pack" Condition="'$(StagedNativeRoot)' == ''">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+  <Target Name="BuildNativeLibrary" BeforeTargets="BeforeBuild" Condition="'$(StagedNativeRoot)' == ''">
     <Exec WorkingDirectory="$(RepoRoot)" Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" />
+  </Target>
+  <Target Name="ValidatePackNativeAssets" BeforeTargets="Pack" Condition="'$(StagedNativeRoot)' == ''">
+    <Error Text="Packing Rheo.Storage requires staged native assets for all supported runtimes. Use the repo packaging flow so both win-x64 and win-arm64 assets are included." />
   </Target>
   <Target AfterTargets="Build" Name="CopyNativeLibraryToOutput" Condition="'$(StagedNativeRoot)' == ''">
     <Copy SkipUnchangedFiles="true" SourceFiles="$(NativeDllPath)" DestinationFolder="$(OutDir)" />
@@ -41,5 +45,8 @@
   </ItemGroup>
   <ItemGroup>
     <None PackagePath="\" Include="icon-small.png" Pack="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="buildTransitive\Rheo.Storage.targets" Pack="true" PackagePath="buildTransitive\Rheo.Storage.targets" />
   </ItemGroup>
 </Project>
