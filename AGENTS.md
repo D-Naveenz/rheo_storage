@@ -18,6 +18,7 @@
 - Keep ABI-layer constraints out of the Rust core. Solve WinRT-specific shape issues in `rheo_storage_winrt`.
 - Prefer typed errors, deterministic test fixtures, and explicit handling of file-sharing semantics on Windows.
 - Keep project-specific AI guidance in this repo, not in a global skill.
+- Keep durable repo guidance in `AGENTS.md` and `docs/ai/`; use `.codex/` only for Codex app setup and project-scoped Codex configuration.
 
 ## Current Milestone
 - `rheo_storage` owns analysis, immutable metadata, file and directory operations, navigation, debounced watching, typed errors, and filedefs package deserialization/loading.
@@ -33,3 +34,8 @@
 - Update `docs/ai/continuous-learning.md` whenever a repeated implementation lesson appears.
 - Record durable architecture decisions under `docs/adr/`.
 - If a change shifts scope across milestones, update both `docs/ai/project-guidelines.md` and the relevant ADR in the same change.
+
+## Where To Look Next
+- Use `docs/ai/index.md` as the entrypoint for detailed repo guidance.
+- Use `docs/ai/runbooks/` for operational runbooks that are too detailed for this file.
+- Use `.codex/environments/environment.toml` only for Codex app worktree setup, cleanup, and app actions.

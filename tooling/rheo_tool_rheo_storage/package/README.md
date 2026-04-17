@@ -11,3 +11,5 @@ spread across the normal source tree.
 - Launching the builder without a subcommand opens the interactive Rheo shell
   when a real terminal is available, and that shell uses this copied `package/`
   directory as its default source location.
+
+Source: [TrIDNet - File Identifier](https://mark0.net/soft-tridnet-e.html)

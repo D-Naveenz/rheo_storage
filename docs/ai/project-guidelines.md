@@ -57,8 +57,11 @@
 - Keep GitHub Actions thin whenever possible: the operational logic for verification, packaging, and release should live in `rheo_tool`, with workflows acting as wrappers that provide runners, toolchains, caches, and secrets.
 
 ## Documentation Split
+- Use `AGENTS.md` for durable repository entrypoint guidance and routing into more detailed docs.
 - Use rustdoc comments for public Rust items.
 - Use `docs/` for AI guidance, ADRs, and migration notes.
+- Use `docs/ai/runbooks/` for multi-step operational guidance that is too detailed for `AGENTS.md`.
+- Use `.codex/` for Codex-specific project configuration such as local environments, not as the canonical home for repo rules.
 - Avoid duplicating the same guidance in both places.
 - Keep release workflow knowledge in the repo root and `docs/ai` rather than only in GitHub Actions YAML, so future agents understand why the pipeline is shaped the way it is.
 - Keep repo tooling usage documented near the workflows so version bumps and secret handling do not become tribal knowledge.

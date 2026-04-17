@@ -27,3 +27,7 @@
 ## 2026-04-12
 - For a Windows desktop .NET audience, a narrow C ABI plus a managed wrapper is simpler to ship and reason about than carrying WinRT packaging constraints through the whole interop story.
 - JSON payloads are a practical first ABI contract for Rust-to-.NET interop when the foreign language is C# and the richer object model lives in the managed wrapper.
+
+## 2026-04-17
+- `AGENTS.md` should stay the durable routing layer for repository rules, while Codex app worktree setup and quick actions belong in `.codex/environments/environment.toml`.
+- A hybrid split keeps repo guidance portable across agents and tools without giving up Codex-native project setup and app actions.
