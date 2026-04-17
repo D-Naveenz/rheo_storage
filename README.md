@@ -1,72 +1,95 @@
 # Rheo Storage
 
-Rust-first rewrite of `Rheo.Storage`, focused on secure and idiomatic storage
-APIs, definition-driven file analysis, and Windows-first integration.
+Rheo Storage is a Rust-first storage runtime with a Windows-first delivery story.
+It combines definition-driven file analysis, path-based file and directory operations,
+debounced watching, a reusable `RPKG` package format, and a managed .NET wrapper over
+the native core.
 
 ## Workspace
-- `rheo_rpkg`: generic MessagePack-based `RPKG` v2 container crate
-- `rheo_storage`: core runtime library
-- `rheo_storage_ffi`: native C ABI wrapper crate for .NET and other FFI consumers
-- `tooling/rheo_tool`: umbrella operator CLI for definitions, verification, packaging, and release flows
-- `tooling/rheo_tool_rheo_storage`: this repository's defs/config/package/release capability pack
 
-## Crates
+| Project | Purpose |
+| --- | --- |
+| `rheo_rpkg` | Shared `RPKG` v2 container crate for MessagePack payloads, optional metadata, and integrity sections |
+| `rheo_storage` | Rust-native runtime for analysis, metadata, operations, navigation, and watching |
+| `rheo_storage_ffi` | Thin C ABI over `rheo_storage` for managed and native hosts |
+| `bindings/dotnet/Rheo.Storage` | `net10.0` wrapper over `rheo_storage_ffi` |
+| `tooling/rheo_tool` | Operator CLI for verification, packaging, release, and defs workflows |
+| `tooling/rheo_tool_rheo_storage` | Repository-specific capability pack used by `rheo_tool` |
 
-### `rheo_rpkg`
-- Generic `RPKG` v2 container crate for MessagePack payloads with optional metadata and integrity sections.
-- Used by both the runtime and the builder without pulling TrID-specific behavior into `rheo_storage`.
+## Highlights
 
-### `rheo_storage`
-- Rust-native runtime crate for file analysis, metadata, operations, navigation, and watching.
-- Uses the bundled `filedefs.rpkg` runtime package and reads filedefs payloads through `rheo_rpkg`.
+- Rust-native public API in `rheo_storage`, not a class-for-class port of the legacy C# model
+- Bundled `filedefs.rpkg` runtime package for content-based file analysis
+- File and directory operations that keep the simple path fast and opt into progress only when needed
+- Debounced directory watching for stable change notifications
+- Structured logging with `tracing` in Rust, native log forwarding through `rheo_storage_ffi`, and host integration through `Microsoft.Extensions.Logging`
+- Multi-runtime NuGet packaging for Windows `win-x64` and `win-arm64`
 
-### `rheo_storage_ffi`
-- Native interop layer over `rheo_storage`.
-- Exposes a path-based C ABI with UTF-8 inputs, explicit memory-free helpers, JSON payloads for rich results, operation handles for async/progress workflows, watch handles for directory monitoring, and write sessions for streamed uploads.
+## Quick Start
 
-### `rheo_tool`
-- Primary operator CLI for this repository.
-- Owns the internal command registry, interactive shell, process helpers, and package inspection helpers under `tooling/rheo_tool/src`.
-- Owns `defs`, `verify`, `package`, `release`, `config`, and `version` command groups.
-- Supports direct commands for automation and an interactive shell when launched without a subcommand in a real terminal.
+Rust runtime:
 
-### `rheo_tool_rheo_storage`
-- Repository-specific command capability pack for config sync, defs workflows, CI/package verification, and release packaging.
-- Owns the TrID/package assets and defs engine that used to live in the old standalone builder app.
-- Exposes repo-side command metadata and handlers that `rheo_tool` registers at compile time.
+```rust
+use rheo_storage::{FileStorage, analyze_path};
 
-## Builder Package Assets
-- `tooling/rheo_tool_rheo_storage/package` is kept in the repo for large local builder inputs such as `triddefs_xml.7z`.
-- That folder is excluded from Cargo package publishing, but `rheo_tool_rheo_storage` copies it into the active Cargo output directory during build.
-- The copy target mirrors MSBuild-style output behavior, so after building you can expect `target/debug/package` or `target/release/package` beside the builder executable.
-- The shared defs workflow now uses executable-relative defaults:
-  - `package/` for TrID source discovery
-  - `output/` for generated `filedefs.rpkg`
-  - `logs/` for dated log files such as `2026-04-10_def_builder.log`
-- All three locations can still be overridden from `rheo_tool` with `--package-dir`, `--output-dir`, and `--logs-dir`, or by passing explicit `--input` and `--output` paths on commands that support them.
-- Launching `rheo_tool` without a subcommand in a real terminal opens the interactive Rheo shell.
-- Explicit subcommands still run directly, so scripting and automation remain compatible.
+let report = analyze_path("sample.pdf")?;
+let bytes = FileStorage::from_existing("sample.pdf")?.read()?;
+# Ok::<(), rheo_storage::StorageError>(())
+```
 
-## Release Metadata
+.NET wrapper:
 
-- Repository: <https://github.com/D-Naveenz/rheo_storage>
-- License: Apache-2.0
-- Rust edition: 2024
+```csharp
+using Microsoft.Extensions.Logging;
+using Rheo.Storage;
+
+using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+RheoStorage.UseLoggerFactory(loggerFactory);
+
+var file = RheoStorage.File(@"C:\data\sample.pdf");
+var analysis = file.Analyze();
+var bytes = await file.ReadBytesAsync();
+```
+
+Tooling:
+
+```powershell
+cargo run -p rheo_tool -- verify ci
+cargo run -p rheo_tool -- package verify
+```
+
+## Support Matrix
+
+| Surface | Status |
+| --- | --- |
+| `rheo_rpkg` | Portable Rust crate |
+| `rheo_storage` | Windows-first runtime; portable where the underlying functionality naturally is |
+| `rheo_storage_ffi` | Windows-first native ABI |
+| `Rheo.Storage` NuGet package | Windows `win-x64` and `win-arm64` only |
+
+The NuGet package now fails clearly during package consumption for unsupported RIDs such as `win-x86`,
+and the managed wrapper also throws a `PlatformNotSupportedException` when loaded outside Windows `x64` or `arm64`.
+
+## Logging
+
+- Rust crates emit structured `tracing` events for analysis, metadata loading, operations, watching, package verification, and release flows.
+- `rheo_storage_ffi` exposes a native logger registration API that forwards JSON log records across the ABI.
+- `Rheo.Storage` forwards both managed wrapper logs and native runtime logs into a host `ILoggerFactory`.
+- `rheo_tool` and `rheo_tool_rheo_storage` now emit richer command, configuration, transfer, and verification logs for release diagnostics.
 
 ## Release Flow
 
 - Shared release metadata lives in [rheo.config.toml](./rheo.config.toml).
-- Local developer secrets belong in `.env.local`, created from [.env.example](./.env.example).
-- [`rheo_tool`](./tooling/rheo_tool) is the supported operator surface for config sync, version edits, env bootstrapping, verification, package validation, and publish flows.
-- GitHub Actions delivery lanes are split by responsibility:
-  - [ci.yml](./.github/workflows/ci.yml): pull request validation only
-  - [package-verify.yml](./.github/workflows/package-verify.yml): build and verify a consumable NuGet package on `main`
-  - [publish-nuget.yml](./.github/workflows/publish-nuget.yml): manual NuGet publish with consumer-side verification
-  - [release-rust.yml](./.github/workflows/release-rust.yml): manual crates.io workspace release
-- Root [release.toml](./release.toml) still configures shared Rust crate releases and tags in the form `v<version>`.
-- See [releasing-rheo-storage-dotnet.md](./docs/reference/releasing-rheo-storage-dotnet.md) for the .NET package flow.
+- Local secrets belong in [.env.local](./.env.example), created from the example file.
+- [tooling/rheo_tool](./tooling/rheo_tool/README.md) is the supported operator surface for config sync, verification, packaging, and publish flows.
+- NuGet verification checks that both `runtimes/win-x64/native/rheo_storage_ffi.dll` and `runtimes/win-arm64/native/rheo_storage_ffi.dll` are present in the package.
 
-## Consumer Docs
-- [Rust consumer](./docs/reference/rust-consumer.md)
-- [.NET consumer](./docs/reference/dotnet-consumer.md)
-- [.NET release operations](./docs/reference/releasing-rheo-storage-dotnet.md)
+## Docs
+
+- [Rust consumer guide](./docs/reference/rust-consumer.md)
+- [.NET consumer guide](./docs/reference/dotnet-consumer.md)
+- [.NET release guide](./docs/reference/releasing-rheo-storage-dotnet.md)
+- [rheo_rpkg README](./rheo_rpkg/README.md)
+- [rheo_storage README](./rheo_storage/README.md)
+- [rheo_storage_ffi README](./rheo_storage_ffi/README.md)
+- [Rheo.Storage README](./bindings/dotnet/Rheo.Storage/README.md)

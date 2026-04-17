@@ -17,6 +17,8 @@ Use `bindings/dotnet/Rheo.Storage` when consuming Rheo Storage from C# or other
   and `StopWatching`.
 - Stream-based writes use a native write session that accepts chunked uploads
   from managed `Stream` readers.
+- Native Rust logs can be forwarded into a host `ILoggerFactory` through
+  `RheoStorage.UseLoggerFactory`.
 
 ## Public API
 - `RheoStorage.File(path)` creates a `StorageFile`
@@ -37,7 +39,20 @@ Use `bindings/dotnet/Rheo.Storage` when consuming Rheo Storage from C# or other
 ## Packaging
 - The managed project builds `rheo_storage_ffi` during `dotnet build`
 - The native DLL is copied to the output folder for local development
-- NuGet packaging places the native asset under `runtimes/win-x64/native`
+- NuGet packaging stages both native assets:
+  - `runtimes/win-x64/native/rheo_storage_ffi.dll`
+  - `runtimes/win-arm64/native/rheo_storage_ffi.dll`
+- The NuGet package supports Windows `x64` and `arm64` only
+- Package consumption fails clearly for explicit unsupported RIDs such as `win-x86`
+- Runtime usage outside Windows `x64` or `arm64` throws `PlatformNotSupportedException`
+
+## Logging
+- Call `RheoStorage.UseLoggerFactory(loggerFactory)` to forward native and managed
+  logs into the host logging pipeline
+- Native log records include level, category, message, timestamps, and structured
+  fields captured from Rust `tracing`
+- Async operation handles emit managed logs for wait, completion, cancellation,
+  and failure transitions
 
 ## Tests
 - `bindings/dotnet/Rheo.Storage.Tests` provides xUnit v3 end-to-end coverage for

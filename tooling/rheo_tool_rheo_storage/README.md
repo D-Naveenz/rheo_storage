@@ -3,14 +3,13 @@
 `rheo_tool_rheo_storage` is the repository-specific capability pack that powers
 `rheo_tool` for this workspace.
 
-It currently owns:
+It owns:
 
-- building reduced `filedefs.rpkg` packages from TrID XML inputs
-- reading `.xml`, extracted directories, and `.7z` archives
-- normalizing and verifying existing package files
-- refreshing the embedded runtime package with `sync-embedded`
-- repository config/version synchronization
-- package verification and publish flows for `Rheo.Storage`
+- TrID XML ingestion from `.xml`, extracted directories, and `.7z` archives
+- normalization and validation of the `filedefs.rpkg` runtime package
+- embedded package sync for the runtime crate
+- repo config and version synchronization
+- NuGet package verification and publish flows for `Rheo.Storage`
 
 ## Default Working Folders
 
@@ -22,13 +21,21 @@ repo-relative defaults:
 - `logs/` for dated log files such as `2026-04-10_def_builder.log`
 
 The local `package/` folder inside this crate is excluded from Cargo package
-publishing and copied beside the built artifacts during a normal build.
+publishing and copied beside built artifacts during a normal build.
 
-## Repository
+## Logging
 
-- Workspace: <https://github.com/D-Naveenz/rheo_storage>
-- Root documentation: <https://github.com/D-Naveenz/rheo_storage#readme>
+The capability pack now records richer diagnostic logs for:
 
-## License
+- defs command dispatch and effective options
+- builder progress and output statistics
+- package staging, verification, and publish milestones
+- unsupported runtime verification during NuGet validation
 
-Licensed under Apache-2.0.
+This makes the `logs/` output useful for real release diagnostics rather than
+only start-or-fail breadcrumbs.
+
+## Related Docs
+
+- Workspace root: <https://github.com/D-Naveenz/rheo_storage#readme>
+- Tool shell: <https://github.com/D-Naveenz/rheo_storage/tree/main/tooling/rheo_tool>
