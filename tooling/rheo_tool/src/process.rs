@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use tracing::{debug, info};
 
 fn command_display(program: &str, args: &[String]) -> String {
     if args.is_empty() {
@@ -14,6 +15,13 @@ fn command_display(program: &str, args: &[String]) -> String {
 
 pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
     println!("> {}", command_display(program, args));
+    info!(
+        target: "rheo_tool::process",
+        program,
+        args = args.join(" "),
+        cwd = %cwd.display(),
+        "running command"
+    );
     let status = prepare_command(program, args, cwd, &[])?
         .status()
         .with_context(|| format!("failed to start '{program}'"))?;
@@ -24,6 +32,12 @@ pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
             command_display(program, args)
         );
     }
+    debug!(
+        target: "rheo_tool::process",
+        program,
+        status = %status,
+        "command completed successfully"
+    );
     Ok(())
 }
 
@@ -34,6 +48,14 @@ pub fn run_command_with_env(
     envs: &[(&str, &str)],
 ) -> Result<()> {
     println!("> {}", command_display(program, args));
+    info!(
+        target: "rheo_tool::process",
+        program,
+        args = args.join(" "),
+        cwd = %cwd.display(),
+        env_count = envs.len(),
+        "running command with environment overrides"
+    );
     let status = prepare_command(program, args, cwd, envs)?
         .status()
         .with_context(|| format!("failed to start '{program}'"))?;
@@ -44,6 +66,12 @@ pub fn run_command_with_env(
             command_display(program, args)
         );
     }
+    debug!(
+        target: "rheo_tool::process",
+        program,
+        status = %status,
+        "command completed successfully"
+    );
     Ok(())
 }
 

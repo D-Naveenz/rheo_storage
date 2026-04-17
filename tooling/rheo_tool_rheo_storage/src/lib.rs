@@ -35,4 +35,7 @@ pub use runner::{
     BuilderAction, CommandReport, ReportField as BuilderReportField, ReportStatus, execute_action,
     print_report,
 };
-pub use support::{inspect_package_entries, run_command, run_command_with_env, write_nuget_config};
+pub use support::{
+    inspect_package_entries, run_command, run_command_expect_failure, run_command_with_env,
+    write_nuget_config,
+};

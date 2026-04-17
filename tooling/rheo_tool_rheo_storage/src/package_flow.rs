@@ -2,10 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use tracing::{debug, info};
 
 use crate::{
-    CommandResult, RheoRepoConfig, inspect_package_entries, run_command, run_command_with_env,
-    sync, verify_release, write_nuget_config,
+    CommandResult, RheoRepoConfig, inspect_package_entries, run_command,
+    run_command_expect_failure, run_command_with_env, sync, verify_release, write_nuget_config,
 };
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,13 @@ pub fn pack(
     config: &RheoRepoConfig,
     options: &PackageOptions,
 ) -> Result<CommandResult> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        configuration = %options.configuration,
+        output_dir = options.output_dir.as_ref().map(|path| path.display().to_string()).unwrap_or_default(),
+        version_override = options.version_override.as_deref().unwrap_or(""),
+        "packing NuGet package"
+    );
     verify_release(repo_root)?;
     sync(repo_root)?;
 
@@ -54,6 +62,11 @@ pub fn pack(
 
     let package_path = nuget_output.join(format!("{}.{}.nupkg", config.nuget.package_id, version));
     inspect_package_contents(&package_path, config)?;
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        package_path = %package_path.display(),
+        "completed NuGet pack flow"
+    );
 
     Ok(CommandResult::with_message(format!(
         "Packed {}",
@@ -66,6 +79,11 @@ pub fn verify(
     config: &RheoRepoConfig,
     options: &PackageOptions,
 ) -> Result<CommandResult> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        configuration = %options.configuration,
+        "verifying NuGet package"
+    );
     pack(repo_root, config, options)?;
 
     let version = effective_version(config, &options.version_override);
@@ -87,6 +105,7 @@ pub fn verify(
 
     restore_smoke_consumer(repo_root, config, &version, &local_config, None, false)?;
     run_smoke_consumer(repo_root, config, &version)?;
+    verify_unsupported_runtime_rejected(repo_root, config, &version, &local_config)?;
     restore_smoke_consumer(
         repo_root,
         config,
@@ -102,6 +121,11 @@ pub fn verify(
         &working_root.join("smoke-aot"),
         &config.ci.aot_runtime_smoke,
     )?;
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        package_path = %package_path.display(),
+        "completed NuGet verification flow"
+    );
     Ok(CommandResult::with_message(
         "Package verified successfully.",
     ))
@@ -112,6 +136,11 @@ pub fn publish(
     config: &RheoRepoConfig,
     options: &PackageOptions,
 ) -> Result<CommandResult> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        execute_publish = options.execute_publish,
+        "publishing NuGet package"
+    );
     verify(repo_root, config, options)?;
 
     if !options.execute_publish {
@@ -154,9 +183,15 @@ pub fn publish(
     )?;
 
     let published_config = working_root.join("published-package.nuget.config");
-    write_nuget_config(&published_config, &[PathBuf::from(source)])?;
+    write_nuget_config(&published_config, &[PathBuf::from(source.clone())])?;
     restore_smoke_consumer(repo_root, config, &version, &published_config, None, false)?;
     run_smoke_consumer(repo_root, config, &version)?;
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        package_path = %package_path.display(),
+        source = %source,
+        "published NuGet package"
+    );
 
     Ok(CommandResult::with_message(
         "Published package successfully.",
@@ -181,6 +216,13 @@ fn stage_native_assets(
             .rust_targets
             .get(rid)
             .with_context(|| format!("missing rust target mapping for runtime '{rid}'"))?;
+        debug!(
+            target: "rheo_tool_rheo_storage::package_flow",
+            runtime = %rid,
+            rust_target = %target,
+            stage_root = %stage_root.display(),
+            "staging native asset"
+        );
         run_command(
             "cargo",
             &[
@@ -222,6 +264,12 @@ fn stage_native_assets(
 
 fn inspect_package_contents(package_path: &Path, config: &RheoRepoConfig) -> Result<()> {
     let entries = inspect_package_entries(package_path)?;
+    debug!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        package_path = %package_path.display(),
+        entry_count = entries.len(),
+        "inspecting package contents"
+    );
     if !entries
         .iter()
         .any(|entry| entry == "lib/net10.0/Rheo.Storage.dll")
@@ -246,6 +294,14 @@ fn restore_smoke_consumer(
     runtime: Option<&str>,
     publish_aot: bool,
 ) -> Result<()> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        project = %config.ci.smoke_project,
+        version,
+        runtime = runtime.unwrap_or("default"),
+        publish_aot,
+        "restoring smoke consumer"
+    );
     let mut args = vec![
         "restore".to_owned(),
         config.ci.smoke_project.clone(),
@@ -264,6 +320,12 @@ fn restore_smoke_consumer(
 }
 
 fn run_smoke_consumer(repo_root: &Path, config: &RheoRepoConfig, version: &str) -> Result<()> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        project = %config.ci.smoke_project,
+        version,
+        "running smoke consumer"
+    );
     run_command(
         "dotnet",
         &[
@@ -279,6 +341,36 @@ fn run_smoke_consumer(repo_root: &Path, config: &RheoRepoConfig, version: &str) 
     )
 }
 
+fn verify_unsupported_runtime_rejected(
+    repo_root: &Path,
+    config: &RheoRepoConfig,
+    version: &str,
+    nuget_config: &Path,
+) -> Result<()> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        project = %config.ci.smoke_project,
+        version,
+        unsupported_runtime = "win-x86",
+        "verifying unsupported runtime rejection"
+    );
+    run_command_expect_failure(
+        "dotnet",
+        &[
+            "build".to_owned(),
+            config.ci.smoke_project.clone(),
+            "--configuration".to_owned(),
+            "Release".to_owned(),
+            "--runtime".to_owned(),
+            "win-x86".to_owned(),
+            format!("--configfile={}", nuget_config.display()),
+            format!("-p:RheoStoragePackageVersion={version}"),
+        ],
+        repo_root,
+        "supports only win-x64 and win-arm64 runtime identifiers",
+    )
+}
+
 fn publish_aot_smoke_consumer(
     repo_root: &Path,
     config: &RheoRepoConfig,
@@ -286,6 +378,14 @@ fn publish_aot_smoke_consumer(
     output_dir: &Path,
     runtime: &str,
 ) -> Result<()> {
+    info!(
+        target: "rheo_tool_rheo_storage::package_flow",
+        project = %config.ci.smoke_project,
+        version,
+        runtime,
+        output_dir = %output_dir.display(),
+        "publishing AOT smoke consumer"
+    );
     reset_directory(output_dir)?;
     run_command(
         "dotnet",

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use tracing::{debug, info};
 use zip::ZipArchive;
 
 fn command_display(program: &str, args: &[String]) -> String {
@@ -15,6 +16,13 @@ fn command_display(program: &str, args: &[String]) -> String {
 
 pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
     println!("> {}", command_display(program, args));
+    info!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        args = args.join(" "),
+        cwd = %cwd.display(),
+        "running command"
+    );
     let status = prepare_command(program, args, cwd, &[])?
         .status()
         .with_context(|| format!("failed to start '{program}'"))?;
@@ -25,6 +33,12 @@ pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
             command_display(program, args)
         );
     }
+    debug!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        status = %status,
+        "command completed successfully"
+    );
     Ok(())
 }
 
@@ -35,6 +49,14 @@ pub fn run_command_with_env(
     envs: &[(&str, &str)],
 ) -> Result<()> {
     println!("> {}", command_display(program, args));
+    info!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        args = args.join(" "),
+        cwd = %cwd.display(),
+        env_count = envs.len(),
+        "running command with environment overrides"
+    );
     let status = prepare_command(program, args, cwd, envs)?
         .status()
         .with_context(|| format!("failed to start '{program}'"))?;
@@ -45,6 +67,58 @@ pub fn run_command_with_env(
             command_display(program, args)
         );
     }
+    debug!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        status = %status,
+        "command completed successfully"
+    );
+    Ok(())
+}
+
+pub fn run_command_expect_failure(
+    program: &str,
+    args: &[String],
+    cwd: &Path,
+    expected_output: &str,
+) -> Result<()> {
+    println!("> {}", command_display(program, args));
+    info!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        args = args.join(" "),
+        cwd = %cwd.display(),
+        expected_output,
+        "running command that is expected to fail"
+    );
+    let output = prepare_command(program, args, cwd, &[])?
+        .output()
+        .with_context(|| format!("failed to start '{program}'"))?;
+    if output.status.success() {
+        bail!(
+            "command unexpectedly succeeded: {}",
+            command_display(program, args)
+        );
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{stdout}\n{stderr}");
+    if !combined.contains(expected_output) {
+        bail!(
+            "command failed without expected output '{}': {}",
+            expected_output,
+            command_display(program, args)
+        );
+    }
+
+    debug!(
+        target: "rheo_tool_rheo_storage::support",
+        program,
+        status = %output.status,
+        expected_output,
+        "command failed as expected"
+    );
     Ok(())
 }
 
@@ -73,6 +147,11 @@ pub fn write_nuget_config(path: &Path, sources: &[PathBuf]) -> Result<()> {
 }
 
 pub fn inspect_package_entries(package_path: &Path) -> Result<Vec<String>> {
+    debug!(
+        target: "rheo_tool_rheo_storage::support",
+        package_path = %package_path.display(),
+        "reading package entries"
+    );
     let file = fs::File::open(package_path)
         .with_context(|| format!("failed to open {}", package_path.display()))?;
     let mut archive = ZipArchive::new(file)

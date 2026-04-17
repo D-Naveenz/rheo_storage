@@ -1,20 +1,26 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use tracing::{error, info};
 
 use crate::{
     BuilderAction, CommandResult, LoggingOptions, ReportField, StructuredReport, ToolContext,
     execute_action, init_logging,
 };
 
+/// Repo-relative working paths used by defs commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefsPaths {
+    /// Source directory or archive root used to discover TrID XML inputs.
     pub package_dir: PathBuf,
+    /// Output directory used for generated `filedefs.rpkg` artifacts.
     pub output_dir: PathBuf,
+    /// Directory where defs command log files are written.
     pub logs_dir: PathBuf,
 }
 
 impl DefsPaths {
+    /// Resolves defs working paths from the current tool context.
     pub fn from_context(context: &ToolContext) -> Self {
         Self::from_repo_root(
             &context.repo_root,
@@ -24,6 +30,7 @@ impl DefsPaths {
         )
     }
 
+    /// Resolves defs working paths from a repo root plus optional overrides.
     pub fn from_repo_root(
         repo_root: &Path,
         package_dir: Option<PathBuf>,
@@ -42,6 +49,7 @@ impl DefsPaths {
         }
     }
 
+    /// Returns the preferred default input path for TrID XML ingestion.
     pub fn default_trid_input_path(&self) -> PathBuf {
         let preferred_archive = self.package_dir.join("triddefs_xml.7z");
         if preferred_archive.exists() {
@@ -56,11 +64,13 @@ impl DefsPaths {
         self.package_dir.clone()
     }
 
+    /// Returns the default output path for generated `filedefs.rpkg` files.
     pub fn default_package_output_path(&self) -> PathBuf {
         self.output_dir.join("filedefs.rpkg")
     }
 }
 
+/// Supported defs subcommands exposed through `rheo_tool`.
 #[derive(Debug, Clone)]
 pub enum DefsCommand {
     Pack {
@@ -91,8 +101,20 @@ pub enum DefsCommand {
     },
 }
 
+/// Executes a defs command using repository-relative defaults and structured logging.
 pub fn execute(command: DefsCommand, context: &ToolContext) -> Result<CommandResult> {
     let paths = DefsPaths::from_context(context);
+    info!(
+        target: "rheo_tool_rheo_storage::defs",
+        command = ?command,
+        repo_root = %context.repo_root.display(),
+        package_dir = %paths.package_dir.display(),
+        output_dir = %paths.output_dir.display(),
+        logs_dir = %paths.logs_dir.display(),
+        verbose = context.verbose,
+        silent = context.silent,
+        "starting defs command"
+    );
     let logging = init_logging(LoggingOptions {
         silent: context.silent,
         verbose: context.verbose,
@@ -100,8 +122,22 @@ pub fn execute(command: DefsCommand, context: &ToolContext) -> Result<CommandRes
         interactive: false,
     })?;
     let action = resolve_action(command, &paths);
-    let report = execute_action(action, &logging.log_path, |_| {})
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let report = execute_action(action, &logging.log_path, |_| {}).map_err(|error| {
+        error!(
+            target: "rheo_tool_rheo_storage::defs",
+            log_path = %logging.log_path.display(),
+            error = %error,
+            "defs command failed"
+        );
+        anyhow::anyhow!(error.to_string())
+    })?;
+    info!(
+        target: "rheo_tool_rheo_storage::defs",
+        title = report.title(),
+        exit_code = report.exit_code(),
+        log_path = %logging.log_path.display(),
+        "defs command completed"
+    );
 
     Ok(CommandResult {
         exit_code: report.exit_code(),
@@ -120,6 +156,7 @@ pub fn execute(command: DefsCommand, context: &ToolContext) -> Result<CommandRes
     })
 }
 
+/// Returns help text for the defs command group.
 pub fn print_defs_help() -> String {
     [
         "Defs commands:",
@@ -134,6 +171,7 @@ pub fn print_defs_help() -> String {
     .join("\n")
 }
 
+/// Returns the default input and output paths used by `defs sync-embedded`.
 pub fn default_embedded_sync_paths(repo_root: &Path) -> (PathBuf, PathBuf) {
     (
         repo_root

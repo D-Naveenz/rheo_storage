@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use tracing::{debug, info, warn};
+
 use crate::builder::{
     TridBuildProgress, build_trid_xml_package_with_progress, inspect_package, load_bundled_package,
     normalize_package, packages_match, sync_embedded_package, write_package,
@@ -107,6 +109,12 @@ pub fn execute_action<F>(
 where
     F: FnMut(TridBuildProgress),
 {
+    info!(
+        target: "rheo_tool_rheo_storage::runner",
+        action = ?action,
+        log_path = %log_path.display(),
+        "executing builder action"
+    );
     match action {
         BuilderAction::Pack { output } => {
             let package = load_bundled_package()?;
@@ -122,7 +130,17 @@ where
             })
         }
         BuilderAction::BuildTridXml { input, output } => {
-            let build = build_trid_xml_package_with_progress(&input, &mut progress)?;
+            let build = build_trid_xml_package_with_progress(&input, |update| {
+                debug!(
+                    target: "rheo_tool_rheo_storage::runner",
+                    stage = ?update.stage,
+                    parsed_count = update.stats.parsed_count,
+                    accepted_count = update.stats.accepted_count,
+                    final_trimmed = update.stats.final_trimmed,
+                    "received build progress update"
+                );
+                progress(update);
+            })?;
             let written = write_package(&build.package, &output)?;
             let mut fields = vec![
                 field("Input", input.display().to_string()),
@@ -191,6 +209,14 @@ where
         }
         BuilderAction::Verify { left, right } => {
             let matches = packages_match(&left, &right)?;
+            if !matches {
+                warn!(
+                    target: "rheo_tool_rheo_storage::runner",
+                    left = %left.display(),
+                    right = %right.display(),
+                    "package verification reported differences"
+                );
+            }
             Ok(CommandReport {
                 title: "Verification".to_string(),
                 status: if matches {
