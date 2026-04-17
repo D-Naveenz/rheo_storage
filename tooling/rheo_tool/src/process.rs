@@ -123,7 +123,9 @@ mod tests {
         let command = prepare_command("dotnet", &[], temp.path(), &[]).unwrap();
         let envs = command.get_envs().collect::<Vec<_>>();
 
-        let configured_cli_home = envs.iter().find(|(key, _)| *key == OsStr::new("DOTNET_CLI_HOME"));
+        let configured_cli_home = envs
+            .iter()
+            .find(|(key, _)| *key == OsStr::new("DOTNET_CLI_HOME"));
         if std::env::var_os("DOTNET_CLI_HOME").is_some() {
             assert!(
                 configured_cli_home.is_none(),
