@@ -7,10 +7,15 @@ use crate::error::StorageError;
 /// Units used for formatting byte sizes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeUnit {
+    /// Format the value as raw bytes.
     Bytes,
+    /// Format the value in kibibytes.
     KiB,
+    /// Format the value in mebibytes.
     MiB,
+    /// Format the value in gibibytes.
     GiB,
+    /// Format the value in tebibytes.
     TiB,
 }
 
@@ -68,51 +73,72 @@ impl StorageMetadata {
         Ok((storage, metadata))
     }
 
+    /// Returns the absolute path represented by this metadata snapshot.
     pub fn path(&self) -> &Path {
         &self.path
     }
 
+    /// Returns the last path segment for the represented entry.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns whether the entry was marked read-only when the snapshot was created.
     pub fn is_read_only(&self) -> bool {
         self.is_read_only
     }
 
+    /// Returns whether the entry is hidden according to the current platform rules.
     pub fn is_hidden(&self) -> bool {
         self.is_hidden
     }
 
+    /// Returns whether the entry carries the Windows system attribute.
     pub fn is_system(&self) -> bool {
         self.is_system
     }
 
+    /// Returns whether the entry carries the Windows temporary attribute.
     pub fn is_temporary(&self) -> bool {
         self.is_temporary
     }
 
+    /// Returns whether the snapshot describes a symbolic link.
     pub fn is_symbolic_link(&self) -> bool {
         self.is_symbolic_link
     }
 
+    /// Returns the symbolic-link target when the entry is a link and the target could be resolved.
     pub fn link_target(&self) -> Option<&Path> {
         self.link_target.as_deref()
     }
 
+    /// Returns the filesystem creation timestamp when the platform exposes it.
     pub fn created_at(&self) -> Option<SystemTime> {
         self.created_at
     }
 
+    /// Returns the filesystem last-modified timestamp when the platform exposes it.
     pub fn modified_at(&self) -> Option<SystemTime> {
         self.modified_at
     }
 
+    /// Returns the filesystem last-accessed timestamp when the platform exposes it.
     pub fn accessed_at(&self) -> Option<SystemTime> {
         self.accessed_at
     }
 }
 
+/// Formats a byte count using either the requested unit or an automatically selected one.
+///
+/// # Arguments
+///
+/// - `size` (`u64`) - The size in bytes to format.
+/// - `unit` (`Option<SizeUnit>`) - The explicit display unit to use, or `None` to pick one automatically.
+///
+/// # Returns
+///
+/// - `String` - A human-friendly byte-size label using binary units.
 pub fn format_size(size: u64, unit: Option<SizeUnit>) -> String {
     match unit.unwrap_or_else(|| auto_size_unit(size)) {
         SizeUnit::Bytes => format!("{size} B"),

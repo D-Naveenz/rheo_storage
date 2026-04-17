@@ -6,8 +6,8 @@ pub(crate) mod file;
 mod tokio;
 
 pub use common::{
-    DirectoryDeleteOptions, ProgressReporter, ReadOptions, SharedProgressReporter, StorageProgress,
-    TransferOptions, WriteOptions,
+    DirectoryDeleteOptions, ProgressReporter, ReadOptions, SharedProgressReporter,
+    StorageCancellationToken, StorageProgress, TransferOptions, WriteOptions,
 };
 pub use directory::{
     copy_directory, copy_directory_with_options, create_directory, create_directory_all,

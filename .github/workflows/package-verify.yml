@@ -1,0 +1,56 @@
+name: Package Verify
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_CLI_HOME: ${{ github.workspace }}\.dotnet
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify package (windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Add Rust targets
+        run: rustup target add aarch64-pc-windows-msvc
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify package
+        run: cargo run -p rheo_tool -- verify package
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rheo.Storage-package
+          path: |
+            .artifacts/rheo_tool/nuget/*.nupkg
+            .artifacts/rheo_tool/nuget/*.snupkg

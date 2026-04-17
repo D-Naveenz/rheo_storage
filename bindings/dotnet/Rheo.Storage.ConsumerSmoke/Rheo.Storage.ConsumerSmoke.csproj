@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <PublishAot Condition="'$(PublishAot)' == ''">false</PublishAot>
+    <RheoStoragePackageVersion Condition="'$(RheoStoragePackageVersion)' == ''">2.0.0</RheoStoragePackageVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rheo.Storage" Version="$(RheoStoragePackageVersion)" />
+  </ItemGroup>
+</Project>

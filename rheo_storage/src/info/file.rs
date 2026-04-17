@@ -2,6 +2,7 @@ use std::path::Path;
 use std::thread;
 
 use once_cell::sync::OnceCell;
+use tracing::{debug, info};
 
 use crate::analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path};
 use crate::error::StorageError;
@@ -23,6 +24,11 @@ pub struct FileInfo {
 impl FileInfo {
     /// Load basic file metadata without running content analysis.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, StorageError> {
+        debug!(
+            target: "rheo_storage::info::file",
+            path = %path.as_ref().display(),
+            "loading file metadata"
+        );
         let (metadata, fs_metadata) = StorageMetadata::from_path(path)?;
         if !fs_metadata.is_file() {
             return Err(StorageError::NotAFile {
@@ -48,6 +54,11 @@ impl FileInfo {
     /// Load basic file metadata while precomputing content analysis in parallel.
     pub fn from_path_with_analysis(path: impl AsRef<Path>) -> Result<Self, StorageError> {
         let owned_path = path.as_ref().to_path_buf();
+        info!(
+            target: "rheo_storage::info::file",
+            path = %owned_path.display(),
+            "loading file metadata with eager analysis"
+        );
 
         thread::scope(|scope| {
             let analysis_handle = scope.spawn(|| analyze_path(&owned_path));
@@ -125,6 +136,11 @@ impl FileInfo {
 
     /// Lazily compute and cache content analysis.
     pub fn analysis(&self) -> Result<&AnalysisReport, StorageError> {
+        debug!(
+            target: "rheo_storage::info::file",
+            path = %self.path().display(),
+            "loading file analysis on demand"
+        );
         self.analysis.get_or_try_init(|| analyze_path(self.path()))
     }
 
@@ -155,6 +171,11 @@ impl FileInfo {
 
     /// Lazily load Windows shell display/type information when requested.
     pub fn shell_details(&self) -> Option<&WindowsShellDetails> {
+        debug!(
+            target: "rheo_storage::info::file",
+            path = %self.path().display(),
+            "loading Windows shell details"
+        );
         self.shell_details
             .get_or_init(|| load_shell_details(self.path()))
             .as_ref()
@@ -162,6 +183,11 @@ impl FileInfo {
 
     /// Lazily load the Windows shell icon when requested.
     pub fn icon(&self) -> Option<&WindowsShellIcon> {
+        debug!(
+            target: "rheo_storage::info::file",
+            path = %self.path().display(),
+            "loading Windows shell icon"
+        );
         self.shell_icon
             .get_or_init(|| load_shell_icon(self.path()))
             .as_ref()

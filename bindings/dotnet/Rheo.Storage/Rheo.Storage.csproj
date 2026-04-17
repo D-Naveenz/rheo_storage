@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PackageId>Rheo.Storage</PackageId>
+    <Version>2.0.0</Version>
+    <Description>High-level .NET bindings for the native Rheo Storage Rust runtime.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon-small.png</PackageIcon>
+    <RepositoryUrl>https://github.com/D-Naveenz/rheo_storage</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/D-Naveenz/rheo_storage</PackageProjectUrl>
+    <Authors>Naveen Dharmathunga</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageTags>storage;ffi;rust;analysis;file-handling;directory-management;watching</PackageTags>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))\</RepoRoot>
+    <StagedNativeRoot Condition="&apos;$(StagedNativeRoot)&apos; == &apos;&apos;" />
+    <NativeConfiguration Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">release</NativeConfiguration>
+    <NativeConfiguration Condition="&apos;$(NativeConfiguration)&apos; == &apos;&apos;">debug</NativeConfiguration>
+    <NativeCargoArgs Condition="&apos;$(Configuration)&apos; == &apos;Release&apos;">--release</NativeCargoArgs>
+    <NativeDllPath>$(RepoRoot)target\$(NativeConfiguration)\rheo_storage_ffi.dll</NativeDllPath>
+  </PropertyGroup>
+  <ItemGroup Condition="&apos;$(StagedNativeRoot)&apos; != &apos;&apos;">
+    <None Include="$(StagedNativeRoot)\runtimes\**\native\*.dll" Visible="false" Pack="true" PackagePath="%(RecursiveDir)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+  <Target Condition="&apos;$(StagedNativeRoot)&apos; == &apos;&apos;" BeforeTargets="BeforeBuild" Name="BuildNativeLibrary">
+    <Exec WorkingDirectory="$(RepoRoot)" Command="cargo build -p rheo_storage_ffi $(NativeCargoArgs)" />
+  </Target>
+  <Target BeforeTargets="Pack" Name="ValidatePackNativeAssets" Condition="&apos;$(StagedNativeRoot)&apos; == &apos;&apos;">
+    <Error Text="Packing Rheo.Storage requires staged native assets for all supported runtimes. Use the repo packaging flow so both win-x64 and win-arm64 assets are included." />
+  </Target>
+  <Target Name="CopyNativeLibraryToOutput" Condition="&apos;$(StagedNativeRoot)&apos; == &apos;&apos;" AfterTargets="Build">
+    <Copy DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" SourceFiles="$(NativeDllPath)" />
+  </Target>
+  <ItemGroup>
+    <None Include="buildTransitive\Rheo.Storage.targets" PackagePath="buildTransitive\Rheo.Storage.targets" Pack="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <None PackagePath="\" Include="README.md" Pack="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="icon-small.png" PackagePath="\" Pack="true" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,12 @@
+#![deny(missing_docs)]
+
+//! Generic MessagePack-based `RPKG` v2 container support.
+//!
+//! This crate provides the shared package reader and writer used by the Rheo
+//! workspace. It keeps container framing, compression, metadata, and integrity
+//! concerns out of higher-level runtime crates so they can focus on their own
+//! domain models.
+
 use std::io::{Cursor, Read, Write};
 
 use lz4_flex::frame::{FrameDecoder, FrameEncoder};
@@ -6,7 +15,9 @@ use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+/// The four-byte magic header that identifies an `RPKG` container.
 pub const RPKG_MAGIC: &[u8; 4] = b"RPKG";
+/// The currently supported on-disk wire-format version.
 pub const RPKG_WIRE_VERSION: u8 = 2;
 const HEADER_LEN: usize = 28;
 const SECTION_DESCRIPTOR_LEN: usize = 24;
@@ -14,14 +25,23 @@ const PAYLOAD_FORMAT_MESSAGEPACK: u8 = 1;
 const METADATA_FORMAT_MESSAGEPACK: u8 = 1;
 const INTEGRITY_FORMAT_SHA256: u8 = 1;
 
+/// Describes how readers should treat the package by default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackagePurpose {
+    /// Fully featured package intended for standard read paths.
     Standard = 0,
+    /// Package optimized for fast payload reads where metadata is usually optional.
     FastPayload = 1,
+    /// Package optimized for embedded runtime assets with minimal startup overhead.
     Embedded = 2,
 }
 
 impl PackagePurpose {
+    /// Returns the default read options recommended for this package purpose.
+    ///
+    /// # Returns
+    ///
+    /// - [`RpkgReadOptions`] - The default metadata and integrity policy for the purpose.
     pub fn default_read_options(self) -> RpkgReadOptions {
         match self {
             Self::Standard => RpkgReadOptions::default(),
@@ -46,9 +66,12 @@ impl TryFrom<u8> for PackagePurpose {
     }
 }
 
+/// Compression algorithm applied to the payload section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompressionKind {
+    /// The payload is stored without compression.
     None = 0,
+    /// The payload is compressed using an LZ4 frame.
     Lz4Frame = 1,
 }
 
@@ -64,9 +87,12 @@ impl TryFrom<u8> for CompressionKind {
     }
 }
 
+/// Integrity algorithm used for the package integrity section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntegrityKind {
+    /// No integrity section is stored.
     None = 0,
+    /// The integrity section stores a SHA-256 digest.
     Sha256 = 1,
 }
 
@@ -82,11 +108,16 @@ impl TryFrom<u8> for IntegrityKind {
     }
 }
 
+/// Logical section type stored in the package section table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionKind {
+    /// The primary MessagePack payload section.
     Payload = 1,
+    /// Optional MessagePack metadata section.
     Metadata = 2,
+    /// Optional integrity section.
     Integrity = 3,
+    /// Reserved section kind for future chunk index support.
     ChunkIndex = 4,
 }
 
@@ -104,29 +135,46 @@ impl TryFrom<u8> for SectionKind {
     }
 }
 
+/// Parsed header values from the fixed-size `RPKG` package header.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageHeader {
+    /// Wire-format version stored in the header.
     pub wire_version: u8,
+    /// Four-byte application-level package identifier.
     pub package_id: [u8; 4],
+    /// Package purpose advertised by the writer.
     pub purpose: PackagePurpose,
+    /// Compression applied to the payload section.
     pub compression: CompressionKind,
+    /// Writer-controlled flags reserved for higher-level packages.
     pub flags: u8,
+    /// Number of section descriptors in the section table.
     pub section_count: u16,
+    /// Byte offset of the section table from the start of the container.
     pub section_table_offset: u32,
+    /// Total length in bytes of the section table.
     pub section_table_len: u32,
 }
 
+/// Single section-table entry describing one payload, metadata, or integrity section.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionDescriptor {
+    /// Logical section type.
     pub kind: SectionKind,
+    /// Format discriminator for the section contents.
     pub format: u8,
+    /// Byte offset of the section contents from the start of the package.
     pub offset: u64,
+    /// Length in bytes of the section contents.
     pub length: u64,
 }
 
+/// Controls optional integrity and metadata loading during package reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RpkgReadOptions {
+    /// Whether the reader should verify the integrity section when present.
     pub verify_integrity: bool,
+    /// Whether the reader should materialize metadata bytes when present.
     pub load_metadata: bool,
 }
 
@@ -139,77 +187,128 @@ impl Default for RpkgReadOptions {
     }
 }
 
+/// Configures how a new `RPKG` package should be written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RpkgWriteOptions {
+    /// Four-byte application-level package identifier.
     pub package_id: [u8; 4],
+    /// Intended package purpose for downstream readers.
     pub purpose: PackagePurpose,
+    /// Compression algorithm to use for the payload section.
     pub compression: CompressionKind,
+    /// Writer-controlled flags reserved for higher-level consumers.
     pub flags: u8,
+    /// Optional MessagePack metadata bytes to emit as a metadata section.
     pub metadata: Option<Vec<u8>>,
+    /// Integrity section policy for the written package.
     pub integrity: IntegrityKind,
 }
 
+/// Fully decoded `RPKG` container with payload bytes and optional metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedPackage {
+    /// Parsed header values.
     pub header: PackageHeader,
+    /// Parsed section descriptors from the section table.
     pub sections: Vec<SectionDescriptor>,
+    /// Decompressed payload bytes.
     pub payload: Vec<u8>,
+    /// Optional metadata bytes when metadata loading was enabled.
     pub metadata: Option<Vec<u8>>,
+    /// Integrity kind reported by the container.
     pub integrity: IntegrityKind,
+    /// Whether the integrity section was verified successfully during the read.
     pub integrity_verified: bool,
 }
 
+/// Errors that can occur while decoding an `RPKG` container.
 #[derive(Debug, Error)]
 pub enum RpkgDecodeError {
+    /// The input did not begin with the `RPKG` magic header.
     #[error("payload is not an RPKG v2 container")]
     UnsupportedFormat,
+    /// The input ended before the fixed-size header could be read fully.
     #[error("payload is too short for an RPKG header")]
     TruncatedHeader,
+    /// The container advertised a wire-format version that this crate does not support.
     #[error("unsupported RPKG wire version: {0}")]
     UnsupportedWireVersion(u8),
+    /// The package purpose byte did not map to a known [`PackagePurpose`] value.
     #[error("unsupported RPKG purpose: {0}")]
     UnsupportedPurpose(u8),
+    /// The payload compression byte did not map to a known [`CompressionKind`] value.
     #[error("unsupported RPKG compression kind: {0}")]
     UnsupportedCompression(u8),
+    /// The integrity-section format byte did not map to a known [`IntegrityKind`] value.
     #[error("unsupported RPKG integrity kind: {0}")]
     UnsupportedIntegrity(u8),
+    /// A section-table entry used an unknown [`SectionKind`] discriminator.
     #[error("unsupported RPKG section kind: {0}")]
     UnsupportedSectionKind(u8),
+    /// The section table offset, length, or entry count was internally inconsistent.
     #[error("RPKG section table is malformed")]
     InvalidSectionTable,
+    /// No payload section was present in the section table.
     #[error("RPKG payload section is missing")]
     MissingPayloadSection,
+    /// The metadata section length or format was invalid.
     #[error("RPKG metadata section is malformed")]
     InvalidMetadataSection,
+    /// The integrity section length or format was invalid.
     #[error("RPKG integrity section is malformed")]
     InvalidIntegritySection,
+    /// A section offset or length pointed outside the container byte range.
     #[error("RPKG section bytes are out of range")]
     InvalidSectionRange,
+    /// The payload section did not use the expected MessagePack format discriminator.
     #[error("RPKG payload section does not use MessagePack format")]
     InvalidPayloadFormat,
+    /// The metadata section did not use the expected MessagePack format discriminator.
     #[error("RPKG metadata section does not use MessagePack format")]
     InvalidMetadataFormat,
+    /// The stored integrity digest did not match the recomputed payload digest.
     #[error("RPKG payload checksum does not match integrity section")]
     ChecksumMismatch,
+    /// Decompression of the payload section failed.
     #[error("failed to decompress RPKG payload: {0}")]
     Compression(#[from] std::io::Error),
+    /// MessagePack deserialization of the payload failed.
     #[error("failed to decode MessagePack payload: {0}")]
     MessagePack(#[from] rmp_serde::decode::Error),
 }
 
+/// Errors that can occur while encoding an `RPKG` container.
 #[derive(Debug, Error)]
 pub enum RpkgEncodeError {
+    /// MessagePack serialization of the payload or metadata failed.
     #[error("failed to encode MessagePack payload: {0}")]
     MessagePack(#[from] rmp_serde::encode::Error),
+    /// Compression of the payload section failed.
     #[error("failed to compress RPKG payload: {0}")]
     Compression(#[from] std::io::Error),
+    /// Finalization of the LZ4 frame failed after compression.
     #[error("failed to finalize RPKG compression frame: {0}")]
     CompressionFrame(#[from] lz4_flex::frame::Error),
 }
 
+/// Reader utilities for parsing `RPKG` package headers, sections, and payloads.
 pub struct RpkgReader;
 
 impl RpkgReader {
+    /// Parse the fixed-size package header from raw container bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw bytes to inspect.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<PackageHeader, RpkgDecodeError>` - The parsed header when the container prefix is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload is not an `RPKG` container, is truncated,
+    /// or advertises unsupported header values.
     pub fn read_header(bytes: &[u8]) -> Result<PackageHeader, RpkgDecodeError> {
         if bytes.len() < HEADER_LEN {
             if bytes.starts_with(RPKG_MAGIC) {
@@ -236,14 +335,28 @@ impl RpkgReader {
         })
     }
 
+    /// Parse the section table described by a previously decoded header.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    /// - `header` (`&PackageHeader`) - The parsed package header that describes the section table.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<SectionDescriptor>, RpkgDecodeError>` - The decoded section descriptors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the section table is malformed, truncated, or advertises unsupported section kinds.
     pub fn read_sections(
         bytes: &[u8],
         header: &PackageHeader,
     ) -> Result<Vec<SectionDescriptor>, RpkgDecodeError> {
-        let section_table_offset =
-            usize::try_from(header.section_table_offset).map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
-        let section_table_len =
-            usize::try_from(header.section_table_len).map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
+        let section_table_offset = usize::try_from(header.section_table_offset)
+            .map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
+        let section_table_len = usize::try_from(header.section_table_len)
+            .map_err(|_| RpkgDecodeError::InvalidSectionTable)?;
         let table_end = section_table_offset
             .checked_add(section_table_len)
             .ok_or(RpkgDecodeError::InvalidSectionTable)?;
@@ -269,6 +382,20 @@ impl RpkgReader {
         Ok(sections)
     }
 
+    /// Read and decompress the payload section from a raw container.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<u8>, RpkgDecodeError>` - The decoded payload bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the container cannot be parsed, when the payload section
+    /// is missing or malformed, or when decompression fails.
     pub fn read_payload_bytes(bytes: &[u8]) -> Result<Vec<u8>, RpkgDecodeError> {
         let header = Self::read_header(bytes)?;
         let sections = Self::read_sections(bytes, &header)?;
@@ -281,6 +408,21 @@ impl RpkgReader {
         decompress_payload(payload_slice, header.compression)
     }
 
+    /// Read a full package with caller-controlled metadata and integrity behavior.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    /// - `options` (`&RpkgReadOptions`) - The read behavior to apply.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<DecodedPackage, RpkgDecodeError>` - The decoded package contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the container is malformed, when integrity verification
+    /// fails, or when the payload cannot be decompressed.
     pub fn read_package(
         bytes: &[u8],
         options: &RpkgReadOptions,
@@ -331,17 +473,58 @@ impl RpkgReader {
         })
     }
 
+    /// Read a package using the default policy advertised by its [`PackagePurpose`].
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<DecodedPackage, RpkgDecodeError>` - The decoded package contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the header cannot be read or the package fails to decode
+    /// under its purpose-specific default options.
     pub fn read_package_default(bytes: &[u8]) -> Result<DecodedPackage, RpkgDecodeError> {
         let header = Self::read_header(bytes)?;
         let options = header.purpose.default_read_options();
         Self::read_package(bytes, &options)
     }
 
+    /// Decode the payload section into a strongly typed MessagePack value.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<T, RpkgDecodeError>` - The deserialized payload value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload cannot be extracted, decompressed, or deserialized.
     pub fn decode_payload<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, RpkgDecodeError> {
         let payload = Self::read_payload_bytes(bytes)?;
         Ok(rmp_serde::from_slice(&payload)?)
     }
 
+    /// Decode the payload section into a strongly typed value using explicit read options.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw container bytes.
+    /// - `options` (`&RpkgReadOptions`) - The read behavior to apply before deserialization.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<T, RpkgDecodeError>` - The deserialized payload value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when package decoding or MessagePack deserialization fails.
     pub fn decode_payload_with_options<T: DeserializeOwned>(
         bytes: &[u8],
         options: &RpkgReadOptions,
@@ -351,9 +534,24 @@ impl RpkgReader {
     }
 }
 
+/// Writer utilities for creating `RPKG` packages from raw or typed MessagePack payloads.
 pub struct RpkgWriter;
 
 impl RpkgWriter {
+    /// Write an `RPKG` package from raw MessagePack payload bytes.
+    ///
+    /// # Arguments
+    ///
+    /// - `payload` (`&[u8]`) - The MessagePack payload bytes to store.
+    /// - `options` (`&RpkgWriteOptions`) - The package layout and integrity options.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<u8>, RpkgEncodeError>` - The encoded container bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when compression or integrity-frame finalization fails.
     pub fn write_payload_bytes(
         payload: &[u8],
         options: &RpkgWriteOptions,
@@ -368,9 +566,17 @@ impl RpkgWriter {
         };
 
         let mut sections = Vec::with_capacity(3);
-        sections.push((SectionKind::Payload, PAYLOAD_FORMAT_MESSAGEPACK, payload_section));
+        sections.push((
+            SectionKind::Payload,
+            PAYLOAD_FORMAT_MESSAGEPACK,
+            payload_section,
+        ));
         if let Some(metadata) = &options.metadata {
-            sections.push((SectionKind::Metadata, METADATA_FORMAT_MESSAGEPACK, metadata.clone()));
+            sections.push((
+                SectionKind::Metadata,
+                METADATA_FORMAT_MESSAGEPACK,
+                metadata.clone(),
+            ));
         }
         if options.integrity == IntegrityKind::Sha256 {
             sections.push((SectionKind::Integrity, INTEGRITY_FORMAT_SHA256, vec![0; 32]));
@@ -423,6 +629,21 @@ impl RpkgWriter {
         Ok(bytes)
     }
 
+    /// Serialize a value to MessagePack and write it into an `RPKG` container.
+    ///
+    /// # Arguments
+    ///
+    /// - `value` (`&T`) - The value to serialize as the package payload.
+    /// - `options` (`&RpkgWriteOptions`) - The package layout and integrity options.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Vec<u8>, RpkgEncodeError>` - The encoded container bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when MessagePack serialization, compression, or integrity-frame
+    /// finalization fails.
     pub fn write_payload<T: Serialize>(
         value: &T,
         options: &RpkgWriteOptions,
@@ -459,10 +680,7 @@ fn encode_sections(descriptors: &[SectionDescriptor]) -> Vec<u8> {
     bytes
 }
 
-fn find_section(
-    sections: &[SectionDescriptor],
-    kind: SectionKind,
-) -> Option<&SectionDescriptor> {
+fn find_section(sections: &[SectionDescriptor], kind: SectionKind) -> Option<&SectionDescriptor> {
     sections.iter().find(|section| section.kind == kind)
 }
 
@@ -470,9 +688,13 @@ fn read_section_bytes<'a>(
     bytes: &'a [u8],
     descriptor: &SectionDescriptor,
 ) -> Result<&'a [u8], RpkgDecodeError> {
-    let start = usize::try_from(descriptor.offset).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
-    let len = usize::try_from(descriptor.length).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
-    let end = start.checked_add(len).ok_or(RpkgDecodeError::InvalidSectionRange)?;
+    let start =
+        usize::try_from(descriptor.offset).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
+    let len =
+        usize::try_from(descriptor.length).map_err(|_| RpkgDecodeError::InvalidSectionRange)?;
+    let end = start
+        .checked_add(len)
+        .ok_or(RpkgDecodeError::InvalidSectionRange)?;
     if end > bytes.len() {
         return Err(RpkgDecodeError::InvalidSectionRange);
     }
@@ -533,10 +755,8 @@ fn compute_integrity_digest(
 #[cfg(test)]
 mod tests {
     use super::{
-        CompressionKind, IntegrityKind, METADATA_FORMAT_MESSAGEPACK, PackageHeader,
-        PackagePurpose,
-        RpkgDecodeError, RpkgReadOptions, RpkgReader, RpkgWriteOptions, RpkgWriter,
-        SectionKind,
+        CompressionKind, IntegrityKind, METADATA_FORMAT_MESSAGEPACK, PackageHeader, PackagePurpose,
+        RpkgDecodeError, RpkgReadOptions, RpkgReader, RpkgWriteOptions, RpkgWriter, SectionKind,
     };
 
     #[test]
