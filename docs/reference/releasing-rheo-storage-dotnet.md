@@ -39,6 +39,13 @@ cargo run -p rheo_tool -- verify package
   - optionally overrides the NuGet version
   - publishes to nuget.org using the `nuget-production` environment secret
   - restores the published package from nuget.org and reruns the smoke consumer
+- `release-rust.yml`
+  - manual only
+  - validates the Rust workspace and managed wrapper tests before release
+  - can either bump the Rust workspace version during the release or publish the
+    version that is already committed on `main`
+  - when the version is already managed locally through `cargo run -p rheo_tool -- version ...`,
+    run the workflow with `bump_version=false`
 
 ## Versioning
 
