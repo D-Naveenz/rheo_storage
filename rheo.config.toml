@@ -1,5 +1,5 @@
 [versions]
-rust_workspace = "0.2.0"
+rust_workspace = "0.3.0"
 nuget_package = "2.0.0"
 
 [nuget]
@@ -8,13 +8,13 @@ source = "https://api.nuget.org/v3/index.json"
 authors = ["Naveen Dharmathunga"]
 description = "High-level .NET bindings for the native Rheo Storage Rust runtime."
 tags = [
-  "storage",
-  "ffi",
-  "rust",
-  "analysis",
-  "file-handling",
-  "directory-management",
-  "watching",
+    "storage",
+    "ffi",
+    "rust",
+    "analysis",
+    "file-handling",
+    "directory-management",
+    "watching",
 ]
 readme = "bindings/dotnet/Rheo.Storage/README.md"
 icon = "bindings/dotnet/Rheo.Storage/icon-small.png"
@@ -25,7 +25,10 @@ project_url = "https://github.com/D-Naveenz/rheo_storage"
 smoke_project = "bindings/dotnet/Rheo.Storage.ConsumerSmoke/Rheo.Storage.ConsumerSmoke.csproj"
 package_project = "bindings/dotnet/Rheo.Storage/Rheo.Storage.csproj"
 tests_project = "bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj"
-native_runtimes = ["win-x64", "win-arm64"]
+native_runtimes = [
+    "win-x64",
+    "win-arm64",
+]
 host_runtime_smoke = "win-x64"
 aot_runtime_smoke = "win-x64"
 
@@ -34,5 +37,5 @@ environment = "nuget-production"
 api_key_env = "NUGET_API_KEY"
 
 [targets.rust_targets]
-win-x64 = "x86_64-pc-windows-msvc"
 win-arm64 = "aarch64-pc-windows-msvc"
+win-x64 = "x86_64-pc-windows-msvc"
