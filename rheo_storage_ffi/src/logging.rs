@@ -46,10 +46,7 @@ struct EventFieldVisitor {
 }
 
 impl EventFieldVisitor {
-    fn into_record(
-        mut self,
-        metadata: &tracing::Metadata<'_>,
-    ) -> NativeLogRecord {
+    fn into_record(mut self, metadata: &tracing::Metadata<'_>) -> NativeLogRecord {
         let message = self.fields.remove("message").unwrap_or_default();
         NativeLogRecord {
             level: metadata.level().to_string(),
@@ -68,11 +65,7 @@ impl EventFieldVisitor {
 }
 
 impl tracing::field::Visit for EventFieldVisitor {
-    fn record_debug(
-        &mut self,
-        field: &tracing::field::Field,
-        value: &dyn std::fmt::Debug,
-    ) {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         self.fields
             .insert(field.name().to_owned(), format!("{value:?}"));
     }
@@ -149,7 +142,7 @@ pub(crate) fn install_native_log_bridge() -> Result<(), FfiFailure> {
                 .map_err(|error| error.to_string())
         })
         .clone()
-        .map_err(|message| FfiFailure::error(message))
+        .map_err(FfiFailure::error)
 }
 
 pub(crate) fn set_callback(
