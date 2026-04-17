@@ -5,6 +5,7 @@ use rheo_rpkg::{RpkgDecodeError, RpkgReadOptions, RpkgReader};
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::{debug, info};
 
 use crate::error::StorageError;
 
@@ -12,6 +13,7 @@ const BUNDLED_FILEDEFS_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/resources/filedefs.rpkg"
 ));
+/// Four-byte `RPKG` package identifier used by normalized file-definition packages.
 pub const DEFINITION_PACKAGE_ID: [u8; 4] = *b"FDEF";
 const CATCH_ALL_INDEX: usize = 256;
 
@@ -24,60 +26,87 @@ static DATABASE: Lazy<Result<DefinitionDatabase, String>> = Lazy::new(|| {
         .map_err(|err| err.to_string())
 });
 
+/// Errors that can occur while decoding a file-definition package.
 #[derive(Debug, Error)]
 pub enum DefinitionPackageDecodeError {
+    /// The outer `RPKG` container could not be parsed or validated.
     #[error("failed to decode RPKG container: {0}")]
     Rpkg(#[from] RpkgDecodeError),
 
+    /// The inner MessagePack payload could not be deserialized into the expected schema.
     #[error("failed to decode MessagePack payload: {0}")]
     MessagePack(#[from] rmp_serde::decode::Error),
 
+    /// The package advertised a four-byte identifier other than `FDEF`.
     #[error("unexpected package identifier '{found}'")]
-    InvalidPackageId { found: String },
+    InvalidPackageId {
+        /// The decoded four-byte identifier rendered as text for diagnostics.
+        found: String,
+    },
 }
 
+/// Serialized file-definition package loaded from `filedefs.rpkg`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefinitionPackage {
+    /// The version of the normalized package schema produced by the builder.
     pub package_version: String,
+    /// The upstream source-data version carried through from the TrID source set.
     pub source_version: String,
+    /// Monotonic package revision assigned by the builder.
     pub package_revision: u16,
+    /// Builder-defined package flags.
     pub tags: u32,
+    /// All normalized type definitions contained in the package.
     pub definitions: Vec<DefinitionRecord>,
 }
 
+/// Single normalized file-type definition record.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DefinitionRecord {
+    /// Human-readable label for the detected file type.
     pub file_type: String,
     #[serde(default)]
+    /// Known filename extensions associated with the type.
     pub extensions: Vec<String>,
     #[serde(default)]
+    /// Preferred MIME type associated with the type.
     pub mime_type: String,
     #[serde(default)]
+    /// Additional human-readable notes captured from the source dataset.
     pub remarks: String,
     #[serde(default)]
+    /// Signature patterns and extracted strings used for content matching.
     pub signature: SignatureDefinition,
     #[serde(default)]
+    /// Relative ranking hint used when multiple definitions match.
     pub priority_level: i32,
 }
 
+/// Signature material used to identify a file type from file bytes.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignatureDefinition {
     #[serde(default)]
+    /// Positional byte patterns that must match specific file offsets.
     pub patterns: Vec<SignaturePattern>,
     #[serde(default)]
+    /// Raw strings captured from the source definitions for diagnostics or future matching work.
     pub strings: Vec<Vec<u8>>,
 }
 
+/// Byte sequence that should match at a specific offset within a file.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignaturePattern {
+    /// Zero-based byte offset where the pattern should be evaluated.
     pub position: u16,
     #[serde(default)]
+    /// The expected byte sequence at `position`.
     pub data: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize)]
 struct RawPackage(String, String, u16, IgnoredAny, u32, Vec<DefinitionRecord>);
 
+/// Indexed in-memory database used by the analysis engine to narrow definition candidates quickly.
 #[derive(Debug, Clone)]
 pub struct DefinitionDatabase {
     definitions: Vec<DefinitionRecord>,
@@ -85,6 +114,15 @@ pub struct DefinitionDatabase {
 }
 
 impl DefinitionPackage {
+    /// Decodes a raw MessagePack payload into a normalized definition package.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The MessagePack payload bytes from a definition package.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, rmp_serde::decode::Error>` - The decoded package schema.
     pub fn from_messagepack_bytes(bytes: &[u8]) -> Result<Self, rmp_serde::decode::Error> {
         let RawPackage(package_version, source_version, package_revision, _, tags, definitions): RawPackage =
             rmp_serde::from_slice(bytes)?;
@@ -97,6 +135,20 @@ impl DefinitionPackage {
         })
     }
 
+    /// Decodes a full `filedefs.rpkg` container using the package's default read behavior.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw `RPKG` bytes to decode.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, DefinitionPackageDecodeError>` - The decoded package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the container is malformed, the package identifier is not `FDEF`,
+    /// or the MessagePack payload cannot be deserialized.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DefinitionPackageDecodeError> {
         let header = RpkgReader::read_header(bytes)?;
         if header.package_id != DEFINITION_PACKAGE_ID {
@@ -108,6 +160,21 @@ impl DefinitionPackage {
         Self::from_messagepack_bytes(&payload).map_err(Into::into)
     }
 
+    /// Decodes a full `filedefs.rpkg` container using explicit `RPKG` read options.
+    ///
+    /// # Arguments
+    ///
+    /// - `bytes` (`&[u8]`) - The raw `RPKG` bytes to decode.
+    /// - `options` (`&RpkgReadOptions`) - Reader options that control metadata loading and integrity verification.
+    ///
+    /// # Returns
+    ///
+    /// - `Result<Self, DefinitionPackageDecodeError>` - The decoded package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the container is malformed, fails validation under `options`,
+    /// or does not carry the expected `FDEF` package identifier.
     pub fn from_bytes_with_options(
         bytes: &[u8],
         options: &RpkgReadOptions,
@@ -176,7 +243,17 @@ impl DefinitionDatabase {
     }
 }
 
+/// Returns the embedded file-definition package bundled with the crate.
+///
+/// # Returns
+///
+/// - `Result<&'static DefinitionPackage, StorageError>` - The lazily decoded embedded package.
+///
+/// # Errors
+///
+/// Returns an error when the embedded `filedefs.rpkg` asset cannot be decoded.
 pub fn bundled_definition_package() -> Result<&'static DefinitionPackage, StorageError> {
+    debug!(target: "rheo_storage::definitions", "loading bundled definition package");
     PACKAGE
         .as_ref()
         .map_err(|message| StorageError::DefinitionsLoad {
@@ -184,14 +261,53 @@ pub fn bundled_definition_package() -> Result<&'static DefinitionPackage, Storag
         })
 }
 
+/// Decodes an in-memory `filedefs.rpkg` blob using default read options.
+///
+/// # Arguments
+///
+/// - `bytes` (`&[u8]`) - The raw package bytes to decode.
+///
+/// # Returns
+///
+/// - `Result<DefinitionPackage, StorageError>` - The decoded file-definition package.
+///
+/// # Errors
+///
+/// Returns an error when the package cannot be parsed, validated, or deserialized.
 pub fn decode_definition_package(bytes: &[u8]) -> Result<DefinitionPackage, StorageError> {
+    info!(
+        target: "rheo_storage::definitions",
+        byte_len = bytes.len(),
+        "decoding definition package with default options"
+    );
     decode_definition_package_with_options(bytes, &RpkgReadOptions::default())
 }
 
+/// Decodes an in-memory `filedefs.rpkg` blob using caller-provided `RPKG` read options.
+///
+/// # Arguments
+///
+/// - `bytes` (`&[u8]`) - The raw package bytes to decode.
+/// - `options` (`&RpkgReadOptions`) - Reader options that control metadata loading and integrity verification.
+///
+/// # Returns
+///
+/// - `Result<DefinitionPackage, StorageError>` - The decoded file-definition package.
+///
+/// # Errors
+///
+/// Returns an error when the package cannot be parsed, validated, or deserialized under `options`.
 pub fn decode_definition_package_with_options(
     bytes: &[u8],
     options: &RpkgReadOptions,
 ) -> Result<DefinitionPackage, StorageError> {
+    info!(
+        target: "rheo_storage::definitions",
+        byte_len = bytes.len(),
+        verify_integrity = options.verify_integrity,
+        load_metadata = options.load_metadata,
+        "decoding definition package"
+    );
     DefinitionPackage::from_bytes_with_options(bytes, options).map_err(|err| {
         StorageError::DefinitionsLoad {
             message: err.to_string(),
@@ -199,7 +315,25 @@ pub fn decode_definition_package_with_options(
     })
 }
 
+/// Decodes a raw MessagePack definition-package payload without an outer `RPKG` container.
+///
+/// # Arguments
+///
+/// - `bytes` (`&[u8]`) - The raw MessagePack payload bytes.
+///
+/// # Returns
+///
+/// - `Result<DefinitionPackage, StorageError>` - The decoded file-definition package.
+///
+/// # Errors
+///
+/// Returns an error when the MessagePack payload does not match the expected schema.
 pub fn decode_definition_package_payload(bytes: &[u8]) -> Result<DefinitionPackage, StorageError> {
+    debug!(
+        target: "rheo_storage::definitions",
+        byte_len = bytes.len(),
+        "decoding raw definition package payload"
+    );
     DefinitionPackage::from_messagepack_bytes(bytes).map_err(|err| StorageError::DefinitionsLoad {
         message: err.to_string(),
     })

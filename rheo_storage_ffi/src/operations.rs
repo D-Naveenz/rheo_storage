@@ -21,6 +21,12 @@ use crate::marshal::{
 use crate::models::path_to_string;
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous file copy operation and returns a native operation handle.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. The input strings must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_copy_file(
     source: *const c_char,
     destination: *const c_char,
@@ -51,6 +57,12 @@ pub unsafe extern "C" fn rheo_operation_start_copy_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous file move operation and returns a native operation handle.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. The input strings must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_move_file(
     source: *const c_char,
     destination: *const c_char,
@@ -81,6 +93,12 @@ pub unsafe extern "C" fn rheo_operation_start_move_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous file rename operation within the current parent directory.
+///
+/// # Safety
+///
+/// `source`, `new_name`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo
+/// Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_rename_file(
     source: *const c_char,
     new_name: *const c_char,
@@ -107,6 +125,12 @@ pub unsafe extern "C" fn rheo_operation_start_rename_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous file delete operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_delete_file(
     path: *const c_char,
     out_handle: *mut *mut NativeOperationHandle,
@@ -130,6 +154,12 @@ pub unsafe extern "C" fn rheo_operation_start_delete_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous raw-byte file read operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_read_file(
     path: *const c_char,
     out_handle: *mut *mut NativeOperationHandle,
@@ -158,6 +188,12 @@ pub unsafe extern "C" fn rheo_operation_start_read_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous UTF-8 file read operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_read_file_text(
     path: *const c_char,
     out_handle: *mut *mut NativeOperationHandle,
@@ -190,6 +226,13 @@ pub unsafe extern "C" fn rheo_operation_start_read_file_text(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous raw-byte file write operation.
+///
+/// # Safety
+///
+/// `path`, `data_ptr`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo
+/// Storage FFI pointer contracts. `path` must be valid null-terminated UTF-8, and `data_ptr`
+/// must reference `data_len` readable bytes when `data_len` is non-zero.
 pub unsafe extern "C" fn rheo_operation_start_write_file(
     path: *const c_char,
     data_ptr: *const u8,
@@ -222,6 +265,12 @@ pub unsafe extern "C" fn rheo_operation_start_write_file(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous UTF-8 text file write operation.
+///
+/// # Safety
+///
+/// `path`, `text`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo
+/// Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_write_file_text(
     path: *const c_char,
     text: *const c_char,
@@ -253,6 +302,12 @@ pub unsafe extern "C" fn rheo_operation_start_write_file_text(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous single-directory create operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_create_directory(
     path: *const c_char,
     out_handle: *mut *mut NativeOperationHandle,
@@ -276,6 +331,12 @@ pub unsafe extern "C" fn rheo_operation_start_create_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous recursive directory create operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_create_directory_all(
     path: *const c_char,
     out_handle: *mut *mut NativeOperationHandle,
@@ -299,6 +360,12 @@ pub unsafe extern "C" fn rheo_operation_start_create_directory_all(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous directory-tree copy operation.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. The input strings must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_copy_directory(
     source: *const c_char,
     destination: *const c_char,
@@ -328,6 +395,12 @@ pub unsafe extern "C" fn rheo_operation_start_copy_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous directory-tree move operation.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. The input strings must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_move_directory(
     source: *const c_char,
     destination: *const c_char,
@@ -357,6 +430,12 @@ pub unsafe extern "C" fn rheo_operation_start_move_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous directory rename operation within the current parent directory.
+///
+/// # Safety
+///
+/// `source`, `new_name`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo
+/// Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_operation_start_rename_directory(
     source: *const c_char,
     new_name: *const c_char,
@@ -382,6 +461,12 @@ pub unsafe extern "C" fn rheo_operation_start_rename_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Starts an asynchronous directory delete operation.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_operation_start_delete_directory(
     path: *const c_char,
     recursive: u8,
@@ -408,6 +493,12 @@ pub unsafe extern "C" fn rheo_operation_start_delete_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Reads the latest progress snapshot from a background native operation.
+///
+/// # Safety
+///
+/// `handle`, `out_snapshot`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage
+/// FFI pointer contracts. `out_snapshot` must point to writable memory for one snapshot value.
 pub unsafe extern "C" fn rheo_operation_get_snapshot(
     handle: *mut NativeOperationHandle,
     out_snapshot: *mut RheoOperationSnapshot,
@@ -444,6 +535,11 @@ pub unsafe extern "C" fn rheo_operation_get_snapshot(
 }
 
 #[unsafe(no_mangle)]
+/// Requests cooperative cancellation for a background native operation.
+///
+/// # Safety
+///
+/// `handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_operation_cancel(
     handle: *mut NativeOperationHandle,
     out_error_ptr: *mut *mut u8,
@@ -457,6 +553,12 @@ pub unsafe extern "C" fn rheo_operation_cancel(
 }
 
 #[unsafe(no_mangle)]
+/// Takes the string result produced by a completed background operation.
+///
+/// # Safety
+///
+/// `handle`, `out_string_ptr`, `out_string_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_operation_take_string_result(
     handle: *mut NativeOperationHandle,
     out_string_ptr: *mut *mut u8,
@@ -480,6 +582,12 @@ pub unsafe extern "C" fn rheo_operation_take_string_result(
 }
 
 #[unsafe(no_mangle)]
+/// Takes the byte result produced by a completed background operation.
+///
+/// # Safety
+///
+/// `handle`, `out_bytes_ptr`, `out_bytes_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_operation_take_bytes_result(
     handle: *mut NativeOperationHandle,
     out_bytes_ptr: *mut *mut u8,
@@ -503,6 +611,12 @@ pub unsafe extern "C" fn rheo_operation_take_bytes_result(
 }
 
 #[unsafe(no_mangle)]
+/// Retrieves the last error payload recorded for a background operation.
+///
+/// # Safety
+///
+/// `handle`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_operation_get_error(
     handle: *mut NativeOperationHandle,
     out_json_ptr: *mut *mut u8,
@@ -523,6 +637,12 @@ pub unsafe extern "C" fn rheo_operation_get_error(
 }
 
 #[unsafe(no_mangle)]
+/// Frees a background native operation handle and joins its worker thread if necessary.
+///
+/// # Safety
+///
+/// `handle` must either be null or a pointer previously returned by a Rheo Storage operation-start
+/// function. The pointer must not be freed more than once.
 pub unsafe extern "C" fn rheo_operation_free(handle: *mut NativeOperationHandle) {
     if handle.is_null() {
         return;

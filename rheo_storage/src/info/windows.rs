@@ -1,15 +1,20 @@
 /// Windows shell display metadata loaded lazily when requested.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowsShellDetails {
+    /// Human-friendly display name reported by the Windows shell.
     pub display_name: Option<String>,
+    /// Type label reported by the Windows shell.
     pub type_name: Option<String>,
 }
 
 /// Windows shell icon pixels loaded lazily when requested.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowsShellIcon {
+    /// Icon width in pixels.
     pub width: i32,
+    /// Icon height in pixels.
     pub height: i32,
+    /// RGBA pixel bytes laid out row-major from top-left to bottom-right.
     pub rgba: Vec<u8>,
 }
 

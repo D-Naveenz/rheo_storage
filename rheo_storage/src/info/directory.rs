@@ -3,6 +3,7 @@ use std::path::Path;
 use std::thread;
 
 use once_cell::sync::OnceCell;
+use tracing::{debug, info};
 
 use crate::error::StorageError;
 
@@ -39,6 +40,11 @@ pub struct DirectoryInfo {
 impl DirectoryInfo {
     /// Load basic directory metadata without walking the tree.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self, StorageError> {
+        debug!(
+            target: "rheo_storage::info::directory",
+            path = %path.as_ref().display(),
+            "loading directory metadata"
+        );
         let (metadata, fs_metadata) = StorageMetadata::from_path(path)?;
         if !fs_metadata.is_dir() {
             return Err(StorageError::NotADirectory {
@@ -57,6 +63,11 @@ impl DirectoryInfo {
     /// Load basic directory metadata while precomputing recursive summary in parallel.
     pub fn from_path_with_summary(path: impl AsRef<Path>) -> Result<Self, StorageError> {
         let owned_path = path.as_ref().to_path_buf();
+        info!(
+            target: "rheo_storage::info::directory",
+            path = %owned_path.display(),
+            "loading directory metadata with eager summary"
+        );
 
         thread::scope(|scope| {
             let summary_handle = scope.spawn(|| scan_directory_summary(&owned_path));
@@ -100,6 +111,11 @@ impl DirectoryInfo {
 
     /// Lazily compute and cache recursive directory statistics.
     pub fn summary(&self) -> Result<&DirectorySummary, StorageError> {
+        debug!(
+            target: "rheo_storage::info::directory",
+            path = %self.path().display(),
+            "loading directory summary on demand"
+        );
         self.summary
             .get_or_try_init(|| scan_directory_summary(self.path()))
     }
@@ -126,6 +142,11 @@ impl DirectoryInfo {
 
     /// Lazily load Windows shell display/type information when requested.
     pub fn shell_details(&self) -> Option<&WindowsShellDetails> {
+        debug!(
+            target: "rheo_storage::info::directory",
+            path = %self.path().display(),
+            "loading Windows shell details"
+        );
         self.shell_details
             .get_or_init(|| load_shell_details(self.path()))
             .as_ref()
@@ -133,6 +154,11 @@ impl DirectoryInfo {
 
     /// Lazily load the Windows shell icon when requested.
     pub fn icon(&self) -> Option<&WindowsShellIcon> {
+        debug!(
+            target: "rheo_storage::info::directory",
+            path = %self.path().display(),
+            "loading Windows shell icon"
+        );
         self.shell_icon
             .get_or_init(|| load_shell_icon(self.path()))
             .as_ref()
@@ -140,6 +166,11 @@ impl DirectoryInfo {
 }
 
 fn scan_directory_summary(path: &Path) -> Result<DirectorySummary, StorageError> {
+    debug!(
+        target: "rheo_storage::info::directory",
+        path = %path.display(),
+        "scanning directory summary"
+    );
     let entries = fs::read_dir(path)
         .map_err(|err| StorageError::io("read directory for", path.to_path_buf(), err))?
         .collect::<Result<Vec<_>, _>>()
@@ -161,6 +192,14 @@ fn scan_directory_summary(path: &Path) -> Result<DirectorySummary, StorageError>
             summary += handle.join().expect("directory summary worker panicked")?;
         }
 
+        debug!(
+            target: "rheo_storage::info::directory",
+            path = %path.display(),
+            total_size = summary.total_size,
+            file_count = summary.file_count,
+            directory_count = summary.directory_count,
+            "directory summary completed"
+        );
         Ok(summary)
     })
 }

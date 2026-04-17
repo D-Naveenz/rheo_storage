@@ -12,6 +12,12 @@ use crate::marshal::{
 };
 
 #[unsafe(no_mangle)]
+/// Creates a streaming native write session for incremental file uploads.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_write_session_create(
     path: *const c_char,
     overwrite: u8,
@@ -77,6 +83,12 @@ pub unsafe extern "C" fn rheo_write_session_create(
 }
 
 #[unsafe(no_mangle)]
+/// Appends a chunk of bytes to an open native write session.
+///
+/// # Safety
+///
+/// `handle`, `data_ptr`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `data_ptr` must reference `data_len` readable bytes when `data_len` is non-zero.
 pub unsafe extern "C" fn rheo_write_session_write_chunk(
     handle: *mut NativeWriteSession,
     data_ptr: *const u8,
@@ -91,6 +103,12 @@ pub unsafe extern "C" fn rheo_write_session_write_chunk(
 }
 
 #[unsafe(no_mangle)]
+/// Completes a native write session, flushes the file, and returns the resulting path.
+///
+/// # Safety
+///
+/// `handle`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_write_session_complete(
     handle: *mut NativeWriteSession,
     out_path_ptr: *mut *mut u8,
@@ -108,6 +126,11 @@ pub unsafe extern "C" fn rheo_write_session_complete(
 }
 
 #[unsafe(no_mangle)]
+/// Aborts a native write session and removes any partially written file when possible.
+///
+/// # Safety
+///
+/// `handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_write_session_abort(
     handle: *mut NativeWriteSession,
     out_error_ptr: *mut *mut u8,
@@ -119,6 +142,12 @@ pub unsafe extern "C" fn rheo_write_session_abort(
 }
 
 #[unsafe(no_mangle)]
+/// Frees a native write-session handle.
+///
+/// # Safety
+///
+/// `handle` must either be null or a pointer previously returned by `rheo_write_session_create`.
+/// The pointer must not be freed more than once.
 pub unsafe extern "C" fn rheo_write_session_free(handle: *mut NativeWriteSession) {
     if handle.is_null() {
         return;

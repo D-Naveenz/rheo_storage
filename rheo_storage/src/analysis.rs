@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use tracing::{debug, info};
+
 use crate::definitions::{DefinitionRecord, database};
 use crate::error::StorageError;
 
@@ -64,6 +66,7 @@ impl AnalysisReport {
 /// Analyze a file on disk using shared-read semantics on Windows.
 pub fn analyze_path(path: impl AsRef<Path>) -> Result<AnalysisReport, StorageError> {
     let path = path.as_ref();
+    info!(target: "rheo_storage::analysis", path = %path.display(), "starting path analysis");
     if !path.exists() {
         return Err(StorageError::NotFound {
             path: path.to_path_buf(),
@@ -76,7 +79,17 @@ pub fn analyze_path(path: impl AsRef<Path>) -> Result<AnalysisReport, StorageErr
     }
 
     let mut file = open_analysis_file(path)?;
-    analyze_reader_internal(&mut file, Some(path))
+    let report = analyze_reader_internal(&mut file, Some(path))?;
+    info!(
+        target: "rheo_storage::analysis",
+        path = %path.display(),
+        content_kind = ?report.content_kind,
+        file_size = report.file_size,
+        match_count = report.matches.len(),
+        top_mime_type = report.top_mime_type.as_deref().unwrap_or(""),
+        "completed path analysis"
+    );
+    Ok(report)
 }
 
 /// Analyze an arbitrary reader/seekable source.
@@ -84,6 +97,11 @@ pub fn analyze_reader(
     mut reader: impl Read + Seek,
     source_name: Option<&Path>,
 ) -> Result<AnalysisReport, StorageError> {
+    debug!(
+        target: "rheo_storage::analysis",
+        source_name = source_name.map(|path| path.display().to_string()).unwrap_or_default(),
+        "starting reader analysis"
+    );
     analyze_reader_internal(&mut reader, source_name)
 }
 
@@ -121,6 +139,13 @@ fn analyze_reader_internal(
 
     let db = database()?;
     let candidate_indices = db.candidate_indices(&header);
+    debug!(
+        target: "rheo_storage::analysis",
+        file_size,
+        bytes_scanned = header.len(),
+        candidate_count = candidate_indices.len(),
+        "resolved definition candidates"
+    );
 
     let mut full_buffer: Option<Vec<u8>> = None;
     let mut ranked_matches = Vec::new();
@@ -172,6 +197,12 @@ fn analyze_reader_internal(
             .map(move |ext| (ext, item.score))
     }));
     let content_kind = resolved_content_kind(heuristic_content_kind, top_mime_type.as_deref());
+    debug!(
+        target: "rheo_storage::analysis",
+        content_kind = ?content_kind,
+        match_count = matches.len(),
+        "analysis report ready"
+    );
 
     Ok(AnalysisReport {
         matches,

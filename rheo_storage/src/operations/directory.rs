@@ -3,6 +3,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use tracing::{debug, info};
+
 use crate::error::StorageError;
 use crate::info::DirectoryInfo;
 
@@ -17,6 +19,7 @@ use super::file::copy_file_with_options;
 /// Create a single directory level.
 pub fn create_directory(path: impl AsRef<Path>) -> Result<PathBuf, StorageError> {
     let path = normalize_path(path)?;
+    info!(target: "rheo_storage::operations::directory", path = %path.display(), "creating directory");
     lock_write_targets(&[&path], || {
         fs::create_dir(&path).map_err(|err| StorageError::io("create directory", &path, err))?;
         Ok(path.clone())
@@ -26,6 +29,7 @@ pub fn create_directory(path: impl AsRef<Path>) -> Result<PathBuf, StorageError>
 /// Create a directory tree.
 pub fn create_directory_all(path: impl AsRef<Path>) -> Result<PathBuf, StorageError> {
     let path = normalize_path(path)?;
+    info!(target: "rheo_storage::operations::directory", path = %path.display(), "creating directory tree");
     lock_write_targets(&[&path], || {
         fs::create_dir_all(&path)
             .map_err(|err| StorageError::io("create directory tree", &path, err))?;
@@ -49,6 +53,15 @@ pub fn copy_directory_with_options(
 ) -> Result<PathBuf, StorageError> {
     let source = normalize_existing_directory(source)?;
     let destination = normalize_path(destination)?;
+    info!(
+        target: "rheo_storage::operations::directory",
+        source = %source.display(),
+        destination = %destination.display(),
+        overwrite = options.overwrite,
+        progress = options.progress.is_some(),
+        cancellable = options.cancellation_token.is_some(),
+        "copying directory"
+    );
 
     if source == destination {
         return Err(StorageError::path_conflict(
@@ -81,6 +94,13 @@ pub fn copy_directory_with_options(
             options.cancellation_token.clone(),
         );
         copy_directory_recursive(&source, &destination, &options, &mut progress)?;
+        info!(
+            target: "rheo_storage::operations::directory",
+            source = %source.display(),
+            destination = %destination.display(),
+            total_bytes = total_bytes.unwrap_or_default(),
+            "completed directory copy"
+        );
         Ok(destination.clone())
     })
 }
@@ -101,6 +121,15 @@ pub fn move_directory_with_options(
 ) -> Result<PathBuf, StorageError> {
     let source = normalize_existing_directory(source)?;
     let destination = normalize_path(destination)?;
+    info!(
+        target: "rheo_storage::operations::directory",
+        source = %source.display(),
+        destination = %destination.display(),
+        overwrite = options.overwrite,
+        progress = options.progress.is_some(),
+        cancellable = options.cancellation_token.is_some(),
+        "moving directory"
+    );
 
     if source == destination {
         return Ok(source);
@@ -128,12 +157,23 @@ pub fn move_directory_with_options(
                 });
             }
 
+            info!(
+                target: "rheo_storage::operations::directory",
+                destination = %destination.display(),
+                "moved directory using same-volume rename"
+            );
             return Ok(destination.clone());
         }
 
         copy_directory_with_options(&source, &destination, options.clone())?;
         fs::remove_dir_all(&source)
             .map_err(|err| StorageError::io("delete source directory after move", &source, err))?;
+        info!(
+            target: "rheo_storage::operations::directory",
+            source = %source.display(),
+            destination = %destination.display(),
+            "moved directory using copy/delete fallback"
+        );
         Ok(destination.clone())
     })
 }
@@ -164,6 +204,13 @@ pub fn delete_directory_with_options(
     options: DirectoryDeleteOptions,
 ) -> Result<(), StorageError> {
     let path = normalize_existing_directory(path)?;
+    info!(
+        target: "rheo_storage::operations::directory",
+        path = %path.display(),
+        recursive = options.recursive,
+        cancellable = options.cancellation_token.is_some(),
+        "deleting directory"
+    );
 
     lock_write_targets(&[&path], || {
         if options.recursive {
@@ -185,6 +232,12 @@ fn copy_directory_recursive(
     options: &TransferOptions,
     progress: &mut DirectoryProgress,
 ) -> Result<(), StorageError> {
+    debug!(
+        target: "rheo_storage::operations::directory",
+        source = %source.display(),
+        destination = %destination.display(),
+        "walking directory for copy"
+    );
     for entry in fs::read_dir(source)
         .map_err(|err| StorageError::io("read directory for copy", source, err))?
     {
@@ -316,6 +369,11 @@ fn delete_directory_recursive(
     path: &Path,
     cancellation_token: Option<&super::common::StorageCancellationToken>,
 ) -> Result<(), StorageError> {
+    debug!(
+        target: "rheo_storage::operations::directory",
+        path = %path.display(),
+        "walking directory for delete"
+    );
     super::common::ensure_not_cancelled(cancellation_token, "delete directory")?;
     for entry in fs::read_dir(path)
         .map_err(|err| StorageError::io("read directory for delete", path, err))?

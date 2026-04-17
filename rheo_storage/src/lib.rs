@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 //! Rust-native storage analysis primitives for the Rheo rewrite.
 //!
 //! This crate currently focuses on the first two rewrite milestones:
@@ -6,12 +8,19 @@
 //! layer with optional async wrappers. The package loader reads filedefs
 //! packages through the shared `rheo_rpkg` container crate.
 
+/// Content-based file analysis and heuristic classification helpers.
 pub mod analysis;
+/// Runtime file-definition package types and decoders.
 pub mod definitions;
+/// Typed error values returned by storage operations and metadata queries.
 pub mod error;
+/// Immutable file-system metadata models and formatting helpers.
 pub mod info;
+/// File and directory mutation APIs plus progress and cancellation primitives.
 pub mod operations;
+/// Path-based storage handles layered over the core operation APIs.
 pub mod storage;
+/// Debounced directory watching primitives.
 pub mod watch;
 
 pub use analysis::{AnalysisReport, ContentKind, DetectedDefinition, analyze_path, analyze_reader};

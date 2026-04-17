@@ -1,7 +1,9 @@
 mod directory;
 mod file;
 
+/// Path-based directory storage handle.
 pub use directory::DirectoryStorage;
+/// Path-based file storage handle.
 pub use file::FileStorage;
 
 use std::path::Path;
@@ -22,7 +24,9 @@ pub enum SearchScope {
 /// Rust-native storage handle for an existing file-system entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StorageEntry {
+    /// A file entry.
     File(FileStorage),
+    /// A directory entry.
     Directory(DirectoryStorage),
 }
 

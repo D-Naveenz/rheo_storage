@@ -12,31 +12,47 @@ use rheo_storage::{
 
 use crate::errors::{ErrorPayload, FfiFailure};
 
+/// Status code returned by every exported Rheo Storage FFI function.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RheoStatus {
+    /// The call completed successfully.
     Ok = 0,
+    /// The call failed and an error payload may be available in the provided output buffer.
     Error = 1,
+    /// The caller supplied an invalid pointer, flag, or argument value.
     InvalidArgument = 2,
+    /// The native call panicked before it could produce a normal status code.
     Panic = 3,
 }
 
+/// Current lifecycle state of a background native operation handle.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RheoOperationState {
+    /// The worker thread is still processing the requested operation.
     Running = 0,
+    /// The operation completed successfully and a result may be available.
     Completed = 1,
+    /// The operation terminated with an error payload.
     Failed = 2,
+    /// The operation observed cooperative cancellation before completion.
     Cancelled = 3,
 }
 
+/// Snapshot of the latest background-operation progress reported through the FFI.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct RheoOperationSnapshot {
+    /// Current lifecycle state of the background operation.
     pub state: RheoOperationState,
+    /// Non-zero when `total_bytes` contains a meaningful expected byte count.
     pub has_total_bytes: u8,
+    /// Expected total byte count when `has_total_bytes` is non-zero.
     pub total_bytes: u64,
+    /// Number of bytes transferred so far.
     pub bytes_transferred: u64,
+    /// Best-effort average transfer rate in bytes per second.
     pub bytes_per_second: f64,
 }
 

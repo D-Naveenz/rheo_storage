@@ -53,6 +53,7 @@ impl StorageCancellationToken {
 
 /// Callback interface for optional storage progress reporting.
 pub trait ProgressReporter: Send + Sync + 'static {
+    /// Receives a progress snapshot from an in-flight storage operation.
     fn report(&self, progress: StorageProgress);
 }
 

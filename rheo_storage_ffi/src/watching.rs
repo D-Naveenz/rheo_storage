@@ -13,6 +13,12 @@ use crate::marshal::{
 use crate::models::StorageChangeEventDto;
 
 #[unsafe(no_mangle)]
+/// Creates a directory-watch handle for debounced filesystem notifications.
+///
+/// # Safety
+///
+/// `path`, `out_handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI
+/// pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_watch_create(
     path: *const c_char,
     recursive: u8,
@@ -64,6 +70,12 @@ pub unsafe extern "C" fn rheo_watch_create(
 }
 
 #[unsafe(no_mangle)]
+/// Attempts to receive the next watch event without blocking and returns JSON when one is available.
+///
+/// # Safety
+///
+/// `handle`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_watch_try_recv_json(
     handle: *mut NativeWatchHandle,
     out_json_ptr: *mut *mut u8,
@@ -82,6 +94,12 @@ pub unsafe extern "C" fn rheo_watch_try_recv_json(
 }
 
 #[unsafe(no_mangle)]
+/// Blocks until the next watch event is available and returns it as JSON.
+///
+/// # Safety
+///
+/// `handle`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_watch_recv_json(
     handle: *mut NativeWatchHandle,
     out_json_ptr: *mut *mut u8,
@@ -100,6 +118,12 @@ pub unsafe extern "C" fn rheo_watch_recv_json(
 }
 
 #[unsafe(no_mangle)]
+/// Waits up to `timeout_ms` for the next watch event and returns it as JSON when available.
+///
+/// # Safety
+///
+/// `handle`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_watch_recv_json_timeout(
     handle: *mut NativeWatchHandle,
     timeout_ms: u64,
@@ -119,6 +143,11 @@ pub unsafe extern "C" fn rheo_watch_recv_json_timeout(
 }
 
 #[unsafe(no_mangle)]
+/// Stops an active directory-watch handle.
+///
+/// # Safety
+///
+/// `handle`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI pointer contracts.
 pub unsafe extern "C" fn rheo_watch_stop(
     handle: *mut NativeWatchHandle,
     out_error_ptr: *mut *mut u8,
@@ -137,6 +166,12 @@ pub unsafe extern "C" fn rheo_watch_stop(
 }
 
 #[unsafe(no_mangle)]
+/// Frees a native watch handle.
+///
+/// # Safety
+///
+/// `handle` must either be null or a pointer previously returned by `rheo_watch_create`. The
+/// pointer must not be freed more than once.
 pub unsafe extern "C" fn rheo_watch_free(handle: *mut NativeWatchHandle) {
     if handle.is_null() {
         return;

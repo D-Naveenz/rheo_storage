@@ -18,6 +18,12 @@ use crate::models::{
 };
 
 #[unsafe(no_mangle)]
+/// Analyzes a file path immediately and returns a JSON report.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_analyze_path(
     path: *const c_char,
     out_json_ptr: *mut *mut u8,
@@ -39,6 +45,12 @@ pub unsafe extern "C" fn rheo_analyze_path(
 }
 
 #[unsafe(no_mangle)]
+/// Reads file metadata and optionally content-analysis data, returning JSON.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_get_file_info(
     path: *const c_char,
     include_analysis: u8,
@@ -67,6 +79,12 @@ pub unsafe extern "C" fn rheo_get_file_info(
 }
 
 #[unsafe(no_mangle)]
+/// Reads directory metadata and optionally directory-summary data, returning JSON.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_get_directory_info(
     path: *const c_char,
     include_summary: u8,
@@ -95,6 +113,12 @@ pub unsafe extern "C" fn rheo_get_directory_info(
 }
 
 #[unsafe(no_mangle)]
+/// Lists child files for a directory and returns the result as JSON.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_list_files(
     path: *const c_char,
     recursive: u8,
@@ -116,6 +140,12 @@ pub unsafe extern "C" fn rheo_list_files(
 }
 
 #[unsafe(no_mangle)]
+/// Lists child directories for a directory and returns the result as JSON.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_list_directories(
     path: *const c_char,
     recursive: u8,
@@ -137,6 +167,12 @@ pub unsafe extern "C" fn rheo_list_directories(
 }
 
 #[unsafe(no_mangle)]
+/// Lists both files and directories for a directory and returns the result as JSON.
+///
+/// # Safety
+///
+/// `path`, `out_json_ptr`, `out_json_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_list_entries(
     path: *const c_char,
     recursive: u8,
@@ -158,6 +194,12 @@ pub unsafe extern "C" fn rheo_list_entries(
 }
 
 #[unsafe(no_mangle)]
+/// Reads the full file contents into an owned byte buffer.
+///
+/// # Safety
+///
+/// `path`, `out_bytes_ptr`, `out_bytes_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_read_file(
     path: *const c_char,
     out_bytes_ptr: *mut *mut u8,
@@ -178,6 +220,12 @@ pub unsafe extern "C" fn rheo_read_file(
 }
 
 #[unsafe(no_mangle)]
+/// Reads the full file contents into an owned UTF-8 string buffer.
+///
+/// # Safety
+///
+/// `path`, `out_string_ptr`, `out_string_len`, `out_error_ptr`, and `out_error_len` must follow
+/// the Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_read_file_text(
     path: *const c_char,
     out_string_ptr: *mut *mut u8,
@@ -198,6 +246,13 @@ pub unsafe extern "C" fn rheo_read_file_text(
 }
 
 #[unsafe(no_mangle)]
+/// Writes an in-memory byte buffer to a file and returns the resulting path.
+///
+/// # Safety
+///
+/// `path`, `data_ptr`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. `path` must be valid null-terminated UTF-8,
+/// and `data_ptr` must reference `data_len` readable bytes when `data_len` is non-zero.
 pub unsafe extern "C" fn rheo_write_file(
     path: *const c_char,
     data_ptr: *const u8,
@@ -222,6 +277,12 @@ pub unsafe extern "C" fn rheo_write_file(
 }
 
 #[unsafe(no_mangle)]
+/// Writes UTF-8 text to a file and returns the resulting path.
+///
+/// # Safety
+///
+/// `path`, `text`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len` must
+/// follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_write_file_text(
     path: *const c_char,
     text: *const c_char,
@@ -245,6 +306,12 @@ pub unsafe extern "C" fn rheo_write_file_text(
 }
 
 #[unsafe(no_mangle)]
+/// Copies a file synchronously and returns the destination path.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_copy_file(
     source: *const c_char,
     destination: *const c_char,
@@ -265,6 +332,12 @@ pub unsafe extern "C" fn rheo_copy_file(
 }
 
 #[unsafe(no_mangle)]
+/// Moves a file synchronously and returns the destination path.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_move_file(
     source: *const c_char,
     destination: *const c_char,
@@ -285,6 +358,12 @@ pub unsafe extern "C" fn rheo_move_file(
 }
 
 #[unsafe(no_mangle)]
+/// Renames a file synchronously and returns the resulting path.
+///
+/// # Safety
+///
+/// `source`, `new_name`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_rename_file(
     source: *const c_char,
     new_name: *const c_char,
@@ -308,6 +387,12 @@ pub unsafe extern "C" fn rheo_rename_file(
 }
 
 #[unsafe(no_mangle)]
+/// Deletes a file synchronously.
+///
+/// # Safety
+///
+/// `path`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI pointer contracts.
+/// `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_delete_file(
     path: *const c_char,
     out_error_ptr: *mut *mut u8,
@@ -320,6 +405,12 @@ pub unsafe extern "C" fn rheo_delete_file(
 }
 
 #[unsafe(no_mangle)]
+/// Creates a directory synchronously and returns the resulting path.
+///
+/// # Safety
+///
+/// `path`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_create_directory(
     path: *const c_char,
     out_path_ptr: *mut *mut u8,
@@ -341,6 +432,12 @@ pub unsafe extern "C" fn rheo_create_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Creates a directory and any missing parents synchronously, returning the resulting path.
+///
+/// # Safety
+///
+/// `path`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len` must follow the
+/// Rheo Storage FFI pointer contracts. `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_create_directory_all(
     path: *const c_char,
     out_path_ptr: *mut *mut u8,
@@ -362,6 +459,12 @@ pub unsafe extern "C" fn rheo_create_directory_all(
 }
 
 #[unsafe(no_mangle)]
+/// Copies a directory tree synchronously and returns the destination path.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_copy_directory(
     source: *const c_char,
     destination: *const c_char,
@@ -382,6 +485,12 @@ pub unsafe extern "C" fn rheo_copy_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Moves a directory tree synchronously and returns the destination path.
+///
+/// # Safety
+///
+/// `source`, `destination`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_move_directory(
     source: *const c_char,
     destination: *const c_char,
@@ -402,6 +511,12 @@ pub unsafe extern "C" fn rheo_move_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Renames a directory synchronously and returns the resulting path.
+///
+/// # Safety
+///
+/// `source`, `new_name`, `out_path_ptr`, `out_path_len`, `out_error_ptr`, and `out_error_len`
+/// must follow the Rheo Storage FFI pointer contracts. String inputs must be valid null-terminated UTF-8 strings.
 pub unsafe extern "C" fn rheo_rename_directory(
     source: *const c_char,
     new_name: *const c_char,
@@ -425,6 +540,12 @@ pub unsafe extern "C" fn rheo_rename_directory(
 }
 
 #[unsafe(no_mangle)]
+/// Deletes a directory synchronously.
+///
+/// # Safety
+///
+/// `path`, `out_error_ptr`, and `out_error_len` must follow the Rheo Storage FFI pointer contracts.
+/// `path` must be a valid null-terminated UTF-8 string.
 pub unsafe extern "C" fn rheo_delete_directory(
     path: *const c_char,
     recursive: u8,
