@@ -123,10 +123,17 @@ mod tests {
         let command = prepare_command("dotnet", &[], temp.path(), &[]).unwrap();
         let envs = command.get_envs().collect::<Vec<_>>();
 
-        assert!(envs.iter().any(|(key, value)| {
-            *key == OsStr::new("DOTNET_CLI_HOME")
-                && value.is_some_and(|v| v.to_string_lossy().contains(".dotnet"))
-        }));
+        let configured_cli_home = envs.iter().find(|(key, _)| *key == OsStr::new("DOTNET_CLI_HOME"));
+        if std::env::var_os("DOTNET_CLI_HOME").is_some() {
+            assert!(
+                configured_cli_home.is_none(),
+                "prepare_command should not override an existing DOTNET_CLI_HOME"
+            );
+        } else {
+            assert!(configured_cli_home.is_some_and(|(_, value)| {
+                value.is_some_and(|v| v.to_string_lossy().contains(".dotnet"))
+            }));
+        }
         assert!(
             !envs
                 .iter()
