@@ -76,5 +76,5 @@ Applications can install any standard `tracing` subscriber before calling into t
 ## Related Docs
 
 - Workspace overview: <https://github.com/D-Naveenz/rheo_storage>
-- Rust consumer guide: <https://github.com/D-Naveenz/rheo_storage/tree/main/docs/reference/rust-consumer.md>
+- Rust consumer guide: `%USERPROFILE%\OneDrive\Documents\MindVault\AI\Workspaces\rheo-storage\References\Rust Consumer.md`
 - Native ABI wrapper: <https://github.com/D-Naveenz/rheo_storage/tree/main/rheo_storage_ffi>
