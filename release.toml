@@ -1,8 +1,0 @@
-allow-branch = ["main"]
-push-remote = "origin"
-shared-version = true
-consolidate-commits = true
-consolidate-pushes = true
-tag-name = "v{{version}}"
-tag-message = "rheo_storage {{version}}"
-pre-release-commit-message = "chore(release): {{version}}"
