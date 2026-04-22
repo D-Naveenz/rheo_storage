@@ -89,12 +89,12 @@ jobs:
 
       - name: Validate workspace before release
         run: |
-          cargo run -p rheo_tool -- verify release-config
-          cargo test -p rheo_storage --all-features
-          cargo test -p rheo_storage_ffi
-          cargo test -p rheo_tool_rheo_storage
-          cargo test -p rheo_tool
-          dotnet test --configuration Release bindings/dotnet/Rheo.Storage.Tests/Rheo.Storage.Tests.csproj
+          cargo run -p dhara_tool -- verify release-config
+          cargo test -p dhara_storage --all-features
+          cargo test -p dhara_storage_native
+          cargo test -p dhara_tool_dhara_storage
+          cargo test -p dhara_tool
+          dotnet test --configuration Release bindings/dotnet/Dhara.Storage.Tests/Dhara.Storage.Tests.csproj
 
       - name: Ensure crates.io token is present
         if: ${{ inputs.execute }}
