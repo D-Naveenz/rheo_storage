@@ -48,7 +48,7 @@ jobs:
         run: cargo run -p rheo_tool -- verify package
 
       - name: Upload NuGet artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Rheo.Storage-package
           path: |
