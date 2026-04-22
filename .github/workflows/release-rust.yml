@@ -52,7 +52,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-release
-        run: cargo install cargo-release --version 1.1.2 --locked
+        run: cargo install cargo-release --locked
 
       - name: Configure git author
         run: |
@@ -74,14 +74,8 @@ jobs:
             return
           }
 
-          $cargoToml = Get-Content -LiteralPath "Cargo.toml" -Raw
-          $match = [regex]::Match($cargoToml, '(?m)^\s*version\s*=\s*"([^"]+)"\s*$')
-          if (-not $match.Success) {
-            throw "Could not determine the workspace version from Cargo.toml."
-          }
-
           "mode=release-current-version" >> $env:GITHUB_OUTPUT
-          "value=$($match.Groups[1].Value)" >> $env:GITHUB_OUTPUT
+          "value=release" >> $env:GITHUB_OUTPUT
 
       - name: Report release mode
         shell: pwsh
@@ -100,7 +94,7 @@ jobs:
 
       - name: Dry run workspace release
         if: ${{ !inputs.execute }}
-        run: cargo release ${{ steps.release_mode.outputs.value }} --workspace --isolated --no-dev-version --tag-name v{{version}} --no-confirm --no-verify
+        run: cargo release ${{ steps.release_mode.outputs.value }} --workspace --isolated --tag-name v{{version}} --no-confirm --no-verify
 
       - name: Ensure crates.io token is present
         if: ${{ inputs.execute }}
@@ -113,6 +107,6 @@ jobs:
 
       - name: Execute workspace release
         if: ${{ inputs.execute }}
-        run: cargo release ${{ steps.release_mode.outputs.value }} --workspace --isolated --no-dev-version --tag-name v{{version}} --execute --no-confirm
+        run: cargo release ${{ steps.release_mode.outputs.value }} --workspace --isolated --tag-name v{{version}} --execute --no-confirm
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
