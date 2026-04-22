@@ -8,7 +8,7 @@ It acts as the front door for:
 - local CI-style verification
 - multi-runtime NuGet packaging and publish flows
 - definitions package workflows
-- interactive shell usage for common maintenance paths
+- interactive TUI usage for common maintenance paths
 
 ## Examples
 
@@ -19,7 +19,7 @@ cargo run -p dhara_tool -- release publish --dry-run
 ```
 
 Launching `dhara_tool` without a subcommand in an interactive terminal opens the
-Dhara shell.
+Dhara TUI. Explicit subcommands still use the minimal non-TUI execution path.
 
 ## Logging
 

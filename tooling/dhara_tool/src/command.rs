@@ -14,6 +14,40 @@ pub struct SectionSpec {
     pub summary: &'static str,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArgBinding {
+    Positional,
+    FlagValue(&'static str),
+    Switch(&'static str),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FieldKind {
+    Text,
+    Path,
+    Boolean,
+    Select(&'static [&'static str]),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldSpec {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub help: &'static str,
+    pub kind: FieldKind,
+    pub binding: ArgBinding,
+    pub required: bool,
+    pub default_value: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandUi {
+    pub description: &'static str,
+    pub fields: Vec<FieldSpec>,
+    pub quick_run: bool,
+    pub supports_cancel: bool,
+}
+
 #[derive(Clone)]
 pub struct CommandSpec {
     pub id: &'static str,
@@ -21,6 +55,7 @@ pub struct CommandSpec {
     pub summary: &'static str,
     pub args_summary: &'static str,
     pub section: &'static str,
+    pub ui: CommandUi,
     pub handler: CommandHandler,
 }
 
@@ -28,7 +63,7 @@ pub trait ToolCapability {
     fn register(&self, registry: &mut CommandRegistry);
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct CommandRegistry {
     sections: BTreeMap<&'static str, SectionSpec>,
     commands: Vec<CommandSpec>,
@@ -104,6 +139,23 @@ impl CommandRegistry {
             }
         }
         output
+    }
+}
+
+impl CommandSpec {
+    pub fn path_string(&self) -> String {
+        self.path.join(" ")
+    }
+}
+
+impl CommandUi {
+    pub fn empty(description: &'static str) -> Self {
+        Self {
+            description,
+            fields: Vec::new(),
+            quick_run: false,
+            supports_cancel: false,
+        }
     }
 }
 
@@ -233,6 +285,7 @@ mod tests {
             summary: "Config root",
             args_summary: "",
             section: "config",
+            ui: CommandUi::empty("Config root"),
             handler: Arc::new(noop),
         });
         registry.add_command(CommandSpec {
@@ -241,6 +294,7 @@ mod tests {
             summary: "Show config",
             args_summary: "",
             section: "config",
+            ui: CommandUi::empty("Show config"),
             handler: Arc::new(noop),
         });
 
@@ -264,6 +318,7 @@ mod tests {
             summary: "Verify package",
             args_summary: "[--configuration <name>]",
             section: "verify",
+            ui: CommandUi::empty("Verify package"),
             handler: Arc::new(report_handler),
         });
 
@@ -299,6 +354,7 @@ mod tests {
             summary: "Show config",
             args_summary: "",
             section: "config",
+            ui: CommandUi::empty("Show config"),
             handler: Arc::new(noop),
         });
 

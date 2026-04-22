@@ -1,10 +1,15 @@
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use anyhow::{Context, Result, bail};
 use tracing::{debug, info};
 use zip::ZipArchive;
+
+use crate::output::{emit_stderr_line, emit_stdout_line, set_active_child};
 
 fn command_display(program: &str, args: &[String]) -> String {
     if args.is_empty() {
@@ -15,7 +20,7 @@ fn command_display(program: &str, args: &[String]) -> String {
 }
 
 pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
-    println!("> {}", command_display(program, args));
+    emit_stdout_line(format!("> {}", command_display(program, args)));
     info!(
         target: "dhara_tool_dhara_storage::support",
         program,
@@ -23,9 +28,7 @@ pub fn run_command(program: &str, args: &[String], cwd: &Path) -> Result<()> {
         cwd = %cwd.display(),
         "running command"
     );
-    let status = prepare_command(program, args, cwd, &[])?
-        .status()
-        .with_context(|| format!("failed to start '{program}'"))?;
+    let status = run_command_streaming(program, args, cwd, &[])?;
     if !status.success() {
         bail!(
             "command failed with status {}: {}",
@@ -48,7 +51,7 @@ pub fn run_command_with_env(
     cwd: &Path,
     envs: &[(&str, &str)],
 ) -> Result<()> {
-    println!("> {}", command_display(program, args));
+    emit_stdout_line(format!("> {}", command_display(program, args)));
     info!(
         target: "dhara_tool_dhara_storage::support",
         program,
@@ -57,9 +60,7 @@ pub fn run_command_with_env(
         env_count = envs.len(),
         "running command with environment overrides"
     );
-    let status = prepare_command(program, args, cwd, envs)?
-        .status()
-        .with_context(|| format!("failed to start '{program}'"))?;
+    let status = run_command_streaming(program, args, cwd, envs)?;
     if !status.success() {
         bail!(
             "command failed with status {}: {}",
@@ -82,7 +83,7 @@ pub fn run_command_expect_failure(
     cwd: &Path,
     expected_output: &str,
 ) -> Result<()> {
-    println!("> {}", command_display(program, args));
+    emit_stdout_line(format!("> {}", command_display(program, args)));
     info!(
         target: "dhara_tool_dhara_storage::support",
         program,
@@ -91,9 +92,7 @@ pub fn run_command_expect_failure(
         expected_output,
         "running command that is expected to fail"
     );
-    let output = prepare_command(program, args, cwd, &[])?
-        .output()
-        .with_context(|| format!("failed to start '{program}'"))?;
+    let output = run_command_capture(program, args, cwd, &[])?;
     if output.status.success() {
         bail!(
             "command unexpectedly succeeded: {}",
@@ -198,4 +197,89 @@ fn prepare_command<'a>(
     }
 
     Ok(command)
+}
+
+fn run_command_streaming<'a>(
+    program: &str,
+    args: &[String],
+    cwd: &Path,
+    envs: &[(&'a str, &'a str)],
+) -> Result<std::process::ExitStatus> {
+    let mut command = prepare_command(program, args, cwd, envs)?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let child = command
+        .spawn()
+        .with_context(|| format!("failed to start '{program}'"))?;
+    let child = Arc::new(Mutex::new(child));
+
+    let stdout = child
+        .lock()
+        .expect("child mutex should not be poisoned")
+        .stdout
+        .take();
+    let stderr = child
+        .lock()
+        .expect("child mutex should not be poisoned")
+        .stderr
+        .take();
+
+    let stdout_reader = stdout.map(|pipe| spawn_reader(BufReader::new(pipe), true));
+    let stderr_reader = stderr.map(|pipe| spawn_reader(BufReader::new(pipe), false));
+
+    set_active_child(Some(child.clone()));
+    let status = child
+        .lock()
+        .expect("child mutex should not be poisoned")
+        .wait()
+        .with_context(|| format!("failed to wait for '{program}'"))?;
+    set_active_child(None);
+
+    if let Some(reader) = stdout_reader {
+        let _ = reader.join();
+    }
+    if let Some(reader) = stderr_reader {
+        let _ = reader.join();
+    }
+
+    Ok(status)
+}
+
+fn run_command_capture<'a>(
+    program: &str,
+    args: &[String],
+    cwd: &Path,
+    envs: &[(&'a str, &'a str)],
+) -> Result<std::process::Output> {
+    let mut command = prepare_command(program, args, cwd, envs)?;
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = command
+        .output()
+        .with_context(|| format!("failed to start '{program}'"))?;
+
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        emit_stdout_line(line.to_owned());
+    }
+    for line in String::from_utf8_lossy(&output.stderr).lines() {
+        emit_stderr_line(line.to_owned());
+    }
+
+    Ok(output)
+}
+
+fn spawn_reader<R>(reader: BufReader<R>, stdout: bool) -> thread::JoinHandle<()>
+where
+    R: std::io::Read + Send + 'static,
+{
+    thread::spawn(move || {
+        for line in reader.lines() {
+            let Ok(line) = line else {
+                break;
+            };
+            if stdout {
+                emit_stdout_line(line);
+            } else {
+                emit_stderr_line(line);
+            }
+        }
+    })
 }

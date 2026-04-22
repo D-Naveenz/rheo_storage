@@ -1,0 +1,316 @@
+use ratatui::prelude::*;
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
+
+use crate::command::CommandRegistry;
+
+use super::state::{AppState, Focus, MainView};
+
+pub fn render(frame: &mut Frame<'_>, state: &AppState, registry: &CommandRegistry) {
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(2)])
+        .split(frame.area());
+    let body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(34), Constraint::Min(1)])
+        .split(root[0]);
+    let left = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(8), Constraint::Min(1)])
+        .split(body[0]);
+    let right = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+        .split(body[1]);
+    let output_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
+        .split(right[1]);
+
+    render_sections(frame, left[0], state, registry);
+    render_commands(frame, left[1], state, registry);
+    match state.main_view {
+        MainView::Dashboard => render_dashboard(frame, right[0], state, registry),
+        MainView::Form => render_form(frame, right[0], state, registry),
+    }
+    render_output(frame, output_layout[0], state);
+    render_history(frame, output_layout[1], state);
+    render_footer(frame, root[1], state);
+}
+
+fn render_sections(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &AppState,
+    registry: &CommandRegistry,
+) {
+    let items = registry
+        .sections()
+        .map(|section| ListItem::new(format!("{:<10} {}", section.name, section.summary)))
+        .collect::<Vec<_>>();
+    let mut list_state = ListState::default().with_selected(Some(state.selected_section));
+    let list = List::new(items)
+        .block(focused_block("Sections", state.focus == Focus::Sections))
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan));
+    frame.render_stateful_widget(list, area, &mut list_state);
+}
+
+fn render_commands(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &AppState,
+    registry: &CommandRegistry,
+) {
+    let items = state
+        .commands_for_current_section(registry)
+        .into_iter()
+        .map(|command| ListItem::new(format!("{:<18} {}", command.path_string(), command.summary)))
+        .collect::<Vec<_>>();
+    let mut list_state = ListState::default().with_selected(Some(state.selected_command));
+    let list = List::new(items)
+        .block(focused_block("Commands", state.focus == Focus::Commands))
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Green));
+    frame.render_stateful_widget(list, area, &mut list_state);
+}
+
+fn render_dashboard(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    state: &AppState,
+    registry: &CommandRegistry,
+) {
+    let quick_actions = ["verify ci", "verify package", "config show", "version bump"]
+        .iter()
+        .enumerate()
+        .map(|(index, label)| {
+            let prefix = if index == state.selected_quick_action {
+                ">"
+            } else {
+                " "
+            };
+            format!("{prefix} {label}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let context = format!(
+        "Dhara TUI command hub\n\nQuick actions\n{quick_actions}\n\nCurrent section: {}\nCommands in section: {}\nRepo root: {}\nOutput lines: {}\nRecent history: {}",
+        state.current_section(registry).unwrap_or("none"),
+        state.commands_for_current_section(registry).len(),
+        std::env::current_dir()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| ".".to_owned()),
+        state.output_lines().len(),
+        state.session_history.len(),
+    );
+    let paragraph = Paragraph::new(context)
+        .block(focused_block("Dashboard", state.focus == Focus::Main))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, area);
+}
+
+fn render_form(frame: &mut Frame<'_>, area: Rect, state: &AppState, registry: &CommandRegistry) {
+    let Some(command) = state.current_command(registry) else {
+        frame.render_widget(
+            Paragraph::new("No command selected.")
+                .block(focused_block("Command", state.focus == Focus::Main)),
+            area,
+        );
+        return;
+    };
+    let form = state.forms.get(command.id);
+    let mut lines = vec![
+        Line::raw(command.path_string()),
+        Line::raw(command.ui.description),
+    ];
+    if !command.args_summary.is_empty() {
+        lines.push(Line::raw(format!(
+            "Usage: {} {}",
+            command.path_string(),
+            command.args_summary
+        )));
+    }
+    lines.push(Line::raw(""));
+    for (index, field) in command.ui.fields.iter().enumerate() {
+        let value = form
+            .map(|form| form.display_value(command, index))
+            .unwrap_or_default();
+        let marker = if form.is_some_and(|form| form.selected_field == index) {
+            ">"
+        } else {
+            " "
+        };
+        let editing = if state.focus == Focus::Main
+            && state.editing_text
+            && form.is_some_and(|form| form.selected_field == index)
+        {
+            " (editing)"
+        } else {
+            ""
+        };
+        lines.push(Line::raw(format!(
+            "{marker} {:<18} {}{}",
+            field.label, value, editing
+        )));
+        lines.push(Line::raw(format!("  {}", field.help)));
+    }
+    if command.ui.fields.is_empty() {
+        lines.push(Line::raw(
+            "This command has no form fields and can be run directly.",
+        ));
+    }
+    let paragraph = Paragraph::new(lines)
+        .block(focused_block("Command Form", state.focus == Focus::Main))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, area);
+}
+
+fn render_output(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
+    let output = if state.output_lines().is_empty() {
+        vec![Line::raw("No command output yet.")]
+    } else {
+        state
+            .output_lines()
+            .iter()
+            .map(|line| {
+                let style = if line.is_error {
+                    Style::default().fg(Color::LightRed)
+                } else {
+                    Style::default()
+                };
+                Line::styled(line.text.clone(), style)
+            })
+            .collect()
+    };
+    let paragraph = Paragraph::new(output)
+        .block(focused_block("Run Output", state.focus == Focus::Output))
+        .wrap(Wrap { trim: false })
+        .scroll((state.output_scroll as u16, 0));
+    frame.render_widget(Clear, area);
+    frame.render_widget(paragraph, area);
+}
+
+fn render_history(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
+    let items = if state.session_history.is_empty() {
+        vec![ListItem::new("No history yet.")]
+    } else {
+        state
+            .session_history
+            .iter()
+            .rev()
+            .take(8)
+            .map(|entry| ListItem::new(format!("[{}] {}", entry.status, entry.label)))
+            .collect()
+    };
+    let list = List::new(items).block(
+        Block::default()
+            .title("Recent History")
+            .borders(Borders::ALL),
+    );
+    frame.render_widget(list, area);
+}
+
+fn render_footer(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
+    let help = if state.active_run.is_some() {
+        "Tab focus | q quit | c cancel | d dashboard | Enter select/edit | r run"
+    } else {
+        "Tab focus | q quit | d dashboard | Enter select/edit | r run"
+    };
+    let footer = Paragraph::new(format!("{help} | {}", state.status_message))
+        .style(Style::default().fg(Color::Black).bg(Color::Gray));
+    frame.render_widget(footer, area);
+}
+
+fn focused_block<'a>(title: &'a str, focused: bool) -> Block<'a> {
+    let style = if focused {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default()
+    };
+    Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(style)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use anyhow::Result;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use crate::command::{
+        CommandRegistry, CommandResult, CommandSpec, CommandUi, SectionSpec, ToolContext,
+    };
+
+    use super::render;
+    use crate::tui::state::{AppState, MainView};
+
+    fn noop(_: &ToolContext, _: &[String]) -> Result<CommandResult> {
+        Ok(CommandResult::success())
+    }
+
+    fn registry() -> CommandRegistry {
+        let mut registry = CommandRegistry::new();
+        registry.add_section(SectionSpec {
+            name: "verify",
+            prompt: "verify> ",
+            summary: "Verification commands",
+        });
+        registry.add_command(CommandSpec {
+            id: "verify.ci",
+            path: &["verify", "ci"],
+            summary: "Verify CI",
+            args_summary: "",
+            section: "verify",
+            ui: CommandUi::empty("Run CI"),
+            handler: Arc::new(noop),
+        });
+        registry
+    }
+
+    fn buffer_text(terminal: &Terminal<TestBackend>) -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    #[test]
+    fn renders_dashboard_view() {
+        let registry = registry();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = AppState::new();
+
+        terminal
+            .draw(|frame| render(frame, &state, &registry))
+            .unwrap();
+        let text = buffer_text(&terminal);
+        assert!(text.contains("Dashboard"));
+        assert!(text.contains("Run Output"));
+        assert!(text.contains("Recent History"));
+    }
+
+    #[test]
+    fn renders_form_view() {
+        let registry = registry();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = AppState::new();
+        state.main_view = MainView::Form;
+        state.focus = crate::tui::state::Focus::Main;
+
+        terminal
+            .draw(|frame| render(frame, &state, &registry))
+            .unwrap();
+        let text = buffer_text(&terminal);
+        assert!(text.contains("Command Form"));
+        assert!(text.contains("verify ci"));
+    }
+}

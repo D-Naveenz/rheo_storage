@@ -13,7 +13,7 @@ It stores MessagePack payloads together with:
 
 ```toml
 [dependencies]
-dhara_dhbin = "0.3.0"
+dhara_dhbin = "0.4.0"
 ```
 
 ## Quick Start

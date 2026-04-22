@@ -6,6 +6,7 @@ use crate::builder::{
     TridBuildProgress, build_trid_xml_package_with_progress, inspect_package, load_bundled_package,
     normalize_package, packages_match, sync_embedded_package, write_package,
 };
+use crate::output::emit_stdout_line;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuilderAction {
@@ -275,9 +276,9 @@ where
 }
 
 pub fn print_report(report: &CommandReport) {
-    println!("{}", report.title());
+    emit_stdout_line(report.title().to_owned());
     for entry in report.fields() {
-        println!("{:<20} {}", entry.label(), entry.value());
+        emit_stdout_line(format!("{:<20} {}", entry.label(), entry.value()));
     }
 }
 

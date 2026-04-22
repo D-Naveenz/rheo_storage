@@ -4,6 +4,7 @@ pub mod config;
 pub mod defs;
 pub mod interface;
 pub mod logging;
+pub mod output;
 pub mod package_flow;
 pub mod runner;
 pub mod support;
@@ -30,6 +31,10 @@ pub use interface::{
     ToolContext,
 };
 pub use logging::{LoggingOptions, LoggingRuntime, init_logging, log_file_path};
+pub use output::{
+    OutputCaptureGuard, OutputEvent, OutputStream, cancel_active_subprocess, emit_stderr_line,
+    emit_stdout_line,
+};
 pub use package_flow::{PackageOptions, pack as pack_package, publish as publish_package};
 pub use runner::{
     BuilderAction, CommandReport, ReportField as BuilderReportField, ReportStatus, execute_action,

@@ -8,8 +8,8 @@ spread across the normal source tree.
   compiled binary, similar to an MSBuild "Copy to Output Directory" step.
 - When the CLI runs without an explicit `--input`, it looks here first and
   prefers `triddefs_xml.7z` when it exists.
-- Launching the builder without a subcommand opens the interactive Dhara shell
-  when a real terminal is available, and that shell uses this copied `package/`
-  directory as its default source location.
+- Launching `dhara_tool` without a subcommand opens the interactive Dhara TUI
+  when a real terminal is available, and the defs commands in that TUI use this
+  copied `package/` directory as their default source location.
 
 Source: [TrIDNet - File Identifier](https://mark0.net/soft-tridnet-e.html)
