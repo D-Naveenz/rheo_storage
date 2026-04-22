@@ -43,8 +43,8 @@ cargo run -p rheo_tool -- verify package
   - manual only
   - validates the Rust workspace and managed wrapper tests before release
   - can either bump the Rust workspace version during the release or ask
-    `cargo release` to publish the current release version with the `release`
-    level
+    `cargo release` to publish the current release version by using its default
+    release level
   - when the version is already managed locally through `cargo run -p rheo_tool -- version ...`,
     run the workflow with `bump_version=false`
   - runs `cargo release` in isolated mode, so release behavior is defined by the

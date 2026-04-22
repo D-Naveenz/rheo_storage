@@ -16,7 +16,7 @@ categories = ["filesystem", "external-ffi-bindings", "os::windows-apis"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-rheo_storage = { path = "../rheo_storage" }
+rheo_storage.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"

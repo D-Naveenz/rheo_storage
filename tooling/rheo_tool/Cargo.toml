@@ -11,10 +11,11 @@ readme = "README.md"
 documentation = "https://github.com/D-Naveenz/rheo_storage/tree/main/tooling/rheo_tool"
 keywords = ["tooling", "release", "nuget", "verification", "defs"]
 categories = ["command-line-utilities", "development-tools"]
+publish = false
 
 [dependencies]
 anyhow = "1.0"
-rheo_tool_rheo_storage = { path = "../rheo_tool_rheo_storage" }
+rheo_tool_rheo_storage.workspace = true
 shlex = "1.3"
 tracing = "0.1"
 zip = { version = "2.4", default-features = false, features = ["deflate"] }
