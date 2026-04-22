@@ -207,6 +207,9 @@ pub fn sync_cargo_toml(content: &str, version: &str) -> Result<String> {
         .parse::<DocumentMut>()
         .context("failed to parse Cargo.toml")?;
     document["workspace"]["package"]["version"] = value(version);
+    document["workspace"]["dependencies"]["rheo_rpkg"]["version"] = value(version);
+    document["workspace"]["dependencies"]["rheo_storage"]["version"] = value(version);
+    document["workspace"]["dependencies"]["rheo_tool_rheo_storage"]["version"] = value(version);
     Ok(document.to_string())
 }
 
@@ -577,12 +580,21 @@ mod tests {
     #[test]
     fn sync_cargo_toml_updates_workspace_version() {
         let updated = sync_cargo_toml(
-            "[workspace]\n[workspace.package]\nversion = \"0.1.0\"\n",
+            "[workspace]\n[workspace.package]\nversion = \"0.1.0\"\n[workspace.dependencies]\nrheo_rpkg = { version = \"0.1.0\", path = \"rheo_rpkg\" }\nrheo_storage = { version = \"0.1.0\", path = \"rheo_storage\" }\nrheo_tool_rheo_storage = { version = \"0.1.0\", path = \"tooling/rheo_tool_rheo_storage\" }\n",
             "0.2.0",
         )
         .unwrap();
 
         assert!(updated.contains("version = \"0.2.0\""));
+        assert!(updated.contains("rheo_rpkg = { version = \"0.2.0\", path = \"rheo_rpkg\" }"));
+        assert!(
+            updated.contains("rheo_storage = { version = \"0.2.0\", path = \"rheo_storage\" }")
+        );
+        assert!(
+            updated.contains(
+                "rheo_tool_rheo_storage = { version = \"0.2.0\", path = \"tooling/rheo_tool_rheo_storage\" }"
+            )
+        );
     }
 
     #[test]
