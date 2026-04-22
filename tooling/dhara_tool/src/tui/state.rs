@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use dhara_tool_dhara_storage::OutputStream;
 
@@ -38,6 +39,7 @@ pub struct HistoryEntry {
 }
 
 pub struct AppState {
+    pub repository_label: String,
     pub focus: Focus,
     pub main_view: MainView,
     pub selected_section: usize,
@@ -62,7 +64,12 @@ impl Default for AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        Self::with_repository_label("workspace")
+    }
+
+    pub fn with_repository_label(label: impl Into<String>) -> Self {
         Self {
+            repository_label: label.into(),
             focus: Focus::Main,
             main_view: MainView::Dashboard,
             selected_section: 0,
@@ -78,6 +85,14 @@ impl AppState {
             status_message: "Ready.".to_owned(),
             should_quit: false,
         }
+    }
+
+    pub fn repository_label_from_path(path: &Path) -> String {
+        path.file_name()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| path.display().to_string())
     }
 
     pub fn current_section<'a>(&self, registry: &'a CommandRegistry) -> Option<&'a str> {

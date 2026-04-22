@@ -8,12 +8,16 @@ use super::state::{AppState, Focus, MainView};
 pub fn render(frame: &mut Frame<'_>, state: &AppState, registry: &CommandRegistry) {
     let root = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(2)])
+        .constraints([
+            Constraint::Length(2),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
         .split(frame.area());
     let body = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(34), Constraint::Min(1)])
-        .split(root[0]);
+        .split(root[1]);
     let left = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(8), Constraint::Min(1)])
@@ -27,6 +31,7 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState, registry: &CommandRegistr
         .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
         .split(right[1]);
 
+    render_header(frame, root[0], state);
     render_sections(frame, left[0], state, registry);
     render_commands(frame, left[1], state, registry);
     match state.main_view {
@@ -35,7 +40,28 @@ pub fn render(frame: &mut Frame<'_>, state: &AppState, registry: &CommandRegistr
     }
     render_output(frame, output_layout[0], state);
     render_history(frame, output_layout[1], state);
-    render_footer(frame, root[1], state);
+    render_footer(frame, root[2], state);
+}
+
+fn render_header(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
+    let style = Style::default().fg(Color::White).bg(Color::DarkGray);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(area);
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(rows[0]);
+
+    let title = Paragraph::new(format!(" Dhara Tool  v{}", crate::version())).style(style);
+    let repository = Paragraph::new(format!("{} ", state.repository_label))
+        .style(style)
+        .alignment(Alignment::Right);
+
+    frame.render_widget(Paragraph::new("").style(style), rows[0]);
+    frame.render_widget(title, columns[0]);
+    frame.render_widget(repository, columns[1]);
 }
 
 fn render_sections(
@@ -211,9 +237,9 @@ fn render_history(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
 
 fn render_footer(frame: &mut Frame<'_>, area: Rect, state: &AppState) {
     let help = if state.active_run.is_some() {
-        "Tab focus | q quit | c cancel | d dashboard | Enter select/edit | r run"
+        "Tab focus | Enter select/edit | r run | c cancel | d dashboard | q quit"
     } else {
-        "Tab focus | q quit | d dashboard | Enter select/edit | r run"
+        "Tab focus | Enter select/edit | r run | d dashboard | q quit"
     };
     let footer = Paragraph::new(format!("{help} | {}", state.status_message))
         .style(Style::default().fg(Color::Black).bg(Color::Gray));
@@ -292,6 +318,7 @@ mod tests {
             .draw(|frame| render(frame, &state, &registry))
             .unwrap();
         let text = buffer_text(&terminal);
+        assert!(text.contains("Dhara Tool"));
         assert!(text.contains("Dashboard"));
         assert!(text.contains("Run Output"));
         assert!(text.contains("Recent History"));
@@ -310,6 +337,7 @@ mod tests {
             .draw(|frame| render(frame, &state, &registry))
             .unwrap();
         let text = buffer_text(&terminal);
+        assert!(text.contains("Dhara Tool"));
         assert!(text.contains("Command Form"));
         assert!(text.contains("verify ci"));
     }

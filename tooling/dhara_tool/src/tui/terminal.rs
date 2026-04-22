@@ -27,7 +27,8 @@ pub fn run_tui(registry: &CommandRegistry, context: &ToolContext) -> Result<()> 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).context("failed to create terminal")?;
 
-    let mut state = AppState::new();
+    let mut state =
+        AppState::with_repository_label(AppState::repository_label_from_path(&context.repo_root));
     loop {
         state.poll_active_run();
         terminal.draw(|frame| render(frame, &state, registry))?;
