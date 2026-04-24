@@ -45,12 +45,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Verify package
-        run: cargo run -p rheo_tool -- verify package
+        run: cargo run -p dhara_tool -- verify package
 
       - name: Upload NuGet artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Rheo.Storage-package
+          name: Dhara.Storage-package
           path: |
-            .artifacts/rheo_tool/nuget/*.nupkg
-            .artifacts/rheo_tool/nuget/*.snupkg
+            .artifacts/dhara_tool/nuget/*.nupkg
+            .artifacts/dhara_tool/nuget/*.snupkg
