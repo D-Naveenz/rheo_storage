@@ -185,10 +185,8 @@ impl CommandForm {
                         args.push((*option).to_owned());
                     }
                 }
-                (ArgBinding::Switch(flag), FormValue::Boolean(enabled)) => {
-                    if *enabled {
-                        args.push((*flag).to_owned());
-                    }
+                (ArgBinding::Switch(flag), FormValue::Boolean(enabled)) if *enabled => {
+                    args.push((*flag).to_owned());
                 }
                 _ => {}
             }
