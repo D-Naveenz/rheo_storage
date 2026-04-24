@@ -1,5 +1,8 @@
 # Dhara Storage
 
+![Crates.io Version](https://img.shields.io/crates/v/:crate)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
+
 Dhara Storage is a Rust-first storage runtime with a Windows-first delivery story.
 It combines definition-driven file analysis, path-based file and directory operations,
 debounced watching, a reusable `DHBIN` package format, and a managed .NET wrapper over
@@ -7,14 +10,14 @@ the native core.
 
 ## Workspace
 
-| Project | Purpose |
-| --- | --- |
-| `dhara_dhbin` | Shared `DHBIN` v2 container crate for MessagePack payloads, optional metadata, and integrity sections |
-| `dhara_storage` | Rust-native runtime for analysis, metadata, operations, navigation, and watching |
-| `dhara_storage_native` | Thin C ABI over `dhara_storage` for managed and native hosts |
-| `bindings/dotnet/Dhara.Storage` | `net10.0` wrapper over `dhara_storage_native` |
-| `tooling/dhara_tool` | Operator CLI for verification, packaging, release, and defs workflows |
-| `tooling/dhara_tool_dhara_storage` | Repository-specific capability pack used by `dhara_tool` |
+| Project                            | Purpose                                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `dhara_dhbin`                      | Shared `DHBIN` v2 container crate for MessagePack payloads, optional metadata, and integrity sections |
+| `dhara_storage`                    | Rust-native runtime for analysis, metadata, operations, navigation, and watching                      |
+| `dhara_storage_native`             | Thin C ABI over `dhara_storage` for managed and native hosts                                          |
+| `bindings/dotnet/Dhara.Storage`    | `net10.0` wrapper over `dhara_storage_native`                                                         |
+| `tooling/dhara_tool`               | Operator CLI for verification, packaging, release, and defs workflows                                 |
+| `tooling/dhara_tool_dhara_storage` | Repository-specific capability pack used by `dhara_tool`                                              |
 
 ## Highlights
 
@@ -60,12 +63,12 @@ cargo run -p dhara_tool -- verify package
 
 ## Support Matrix
 
-| Surface | Status |
-| --- | --- |
-| `dhara_dhbin` | Portable Rust crate |
-| `dhara_storage` | Windows-first runtime; portable where the underlying functionality naturally is |
-| `dhara_storage_native` | Windows-first native ABI |
-| `Dhara.Storage` NuGet package | Windows `win-x64` and `win-arm64` only |
+| Surface                       | Status                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| `dhara_dhbin`                 | Portable Rust crate                                                             |
+| `dhara_storage`               | Windows-first runtime; portable where the underlying functionality naturally is |
+| `dhara_storage_native`        | Windows-first native ABI                                                        |
+| `Dhara.Storage` NuGet package | Windows `win-x64` and `win-arm64` only                                          |
 
 The NuGet package now fails clearly during package consumption for unsupported RIDs such as `win-x86`,
 and the managed wrapper also throws a `PlatformNotSupportedException` when loaded outside Windows `x64` or `arm64`.
